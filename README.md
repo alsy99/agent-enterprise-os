@@ -26,6 +26,26 @@ Designed against Anthropic’s guidance:
 - **Dynamic spawn** — missing capabilities create specialists
 - **Learning + handoffs** — SQLite memory, playbooks, History view
 
+## Deploy
+
+- **Frontend → GitHub Pages** (static `out/`)
+- **Backend → Cursor Cloud** (`npm run api` + Cloudflare tunnel)
+
+See **[DEPLOY.md](./DEPLOY.md)** for the full steps, secrets, and caveats.
+
+Quick Cloud backend:
+
+```bash
+npm run api
+# then tunnel, e.g. cloudflared tunnel --url http://127.0.0.1:43124
+```
+
+Static frontend build (point at your public API):
+
+```bash
+NEXT_PUBLIC_API_BASE=https://YOUR-TUNNEL.trycloudflare.com npm run build:pages
+```
+
 ## Quick start
 
 ```bash

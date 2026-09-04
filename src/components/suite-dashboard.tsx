@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
+import { apiFetch } from "@/lib/api";
 import type {
   AgentRecord,
   ChatMessage,
@@ -123,11 +124,11 @@ export function SuiteDashboard() {
     try {
       const [workerRes, objRes, agentRes, historyRes, skillsRes] =
         await Promise.all([
-          fetch("/api/worker", { cache: "no-store" }),
-          fetch("/api/objectives", { cache: "no-store" }),
-          fetch("/api/agents", { cache: "no-store" }),
-          fetch("/api/history", { cache: "no-store" }),
-          fetch("/api/skills", { cache: "no-store" }),
+          apiFetch("/api/worker"),
+          apiFetch("/api/objectives"),
+          apiFetch("/api/agents"),
+          apiFetch("/api/history"),
+          apiFetch("/api/skills"),
         ]);
       const workerJson = await workerRes.json();
       const objJson = await objRes.json();
@@ -174,7 +175,7 @@ export function SuiteDashboard() {
     e.preventDefault();
     setBusy(true);
     try {
-      const res = await fetch("/api/objectives", {
+      const res = await apiFetch("/api/objectives", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ task }),
@@ -197,7 +198,7 @@ export function SuiteDashboard() {
   async function workerAction(action: "start" | "stop") {
     setBusy(true);
     try {
-      await fetch("/api/worker", {
+      await apiFetch("/api/worker", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
@@ -218,9 +219,7 @@ export function SuiteDashboard() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/chat?agentId=${talkAgentId}`, {
-          cache: "no-store",
-        });
+        const res = await apiFetch(`/api/chat?agentId=${talkAgentId}`);
         const json = await res.json();
         if (!cancelled) setChatMessages(json.messages ?? []);
       } catch {
@@ -243,7 +242,7 @@ export function SuiteDashboard() {
     if (!talkAgentId || !chatDraft.trim() || chatBusy) return;
     setChatBusy(true);
     try {
-      const res = await fetch("/api/chat", {
+      const res = await apiFetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ agentId: talkAgentId, message: chatDraft }),
