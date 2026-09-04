@@ -5,6 +5,7 @@ import {
   createObjective,
   createTask,
   emitEvent,
+  getAgent,
   heartbeatAllOnline,
   listAgents,
   listMemories,
@@ -634,7 +635,18 @@ export function executeTask(task: Task): void {
   const objective = listObjectives().find((o) => o.id === task.objectiveId);
   if (!objective || objective.status !== "active") return;
 
-  const agent = ensureAgentForCapability(task.requiredCapability);
+  // Honor direct user assignment when present and capable.
+  const preassigned = task.assignedAgentId
+    ? getAgent(task.assignedAgentId)
+    : null;
+  const agent =
+    preassigned &&
+    (preassigned.capabilities.includes(task.requiredCapability) ||
+      preassigned.capabilities.includes("general") ||
+      preassigned.type === "orchestrator")
+      ? preassigned
+      : ensureAgentForCapability(task.requiredCapability);
+
   const blocked = checkGuardrails(agent, task);
   if (blocked) {
     updateTask(task.id, {
@@ -658,7 +670,9 @@ export function executeTask(task: Task): void {
   addMemory({
     agentId: agent.id,
     kind: "observation",
-    content: `Decision: Nova assigned ${agent.name} (${agent.jobProfile}) because this step requires "${task.requiredCapability}". Why: ${agent.name} is available and covers that capability under suite rules.`,
+    content: preassigned
+      ? `Decision: user assigned ${agent.name} (${agent.jobProfile}) directly for "${task.requiredCapability}".`
+      : `Decision: Nova assigned ${agent.name} (${agent.jobProfile}) because this step requires "${task.requiredCapability}". Why: ${agent.name} is available and covers that capability under suite rules.`,
     tags: ["decision", "assignment", task.requiredCapability],
     relatedTaskId: task.id,
     relatedObjectiveId: objective.id,

@@ -138,3 +138,12 @@ export type WorkerState = {
   ticks: number;
   mode: "local" | "embedded";
 };
+
+export type ChatMessage = {
+  id: string;
+  agentId: string;
+  role: "user" | "agent" | "system";
+  content: string;
+  meta?: Record<string, unknown>;
+  createdAt: string;
+};

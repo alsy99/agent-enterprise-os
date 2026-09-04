@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import type {
   AgentRecord,
+  ChatMessage,
   Handoff,
   MemoryEntry,
   Objective,
@@ -62,7 +63,7 @@ const empty: Snapshot = {
   skills: [],
 };
 
-type View = "board" | "history" | "agents" | "skills";
+type View = "board" | "history" | "agents" | "skills" | "talk";
 
 function statusTone(status: string) {
   switch (status) {
@@ -113,6 +114,10 @@ export function SuiteDashboard() {
   const [showDispatch, setShowDispatch] = useState(false);
   const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
   const [openAgentId, setOpenAgentId] = useState<string | null>(null);
+  const [talkAgentId, setTalkAgentId] = useState<string | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [chatDraft, setChatDraft] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -203,10 +208,63 @@ export function SuiteDashboard() {
     }
   }
 
+  const talkAgent = useMemo(
+    () => data.agents.find((a) => a.id === talkAgentId) ?? null,
+    [data.agents, talkAgentId],
+  );
+
+  useEffect(() => {
+    if (!talkAgentId || view !== "talk") return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/chat?agentId=${talkAgentId}`, {
+          cache: "no-store",
+        });
+        const json = await res.json();
+        if (!cancelled) setChatMessages(json.messages ?? []);
+      } catch {
+        /* ignore transient */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [talkAgentId, view]);
+
+  function openTalk(agentId: string) {
+    setTalkAgentId(agentId);
+    setView("talk");
+    setChatDraft("");
+  }
+
+  async function sendChat(e?: React.FormEvent) {
+    e?.preventDefault();
+    if (!talkAgentId || !chatDraft.trim() || chatBusy) return;
+    setChatBusy(true);
+    try {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: talkAgentId, message: chatDraft }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "Chat failed");
+      setChatMessages(json.messages ?? []);
+      setChatDraft("");
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Chat failed");
+    } finally {
+      setChatBusy(false);
+    }
+  }
+
   const tabs: Array<{ id: View; label: string }> = [
     { id: "board", label: "Ongoing" },
     { id: "history", label: "History" },
     { id: "agents", label: "Agents" },
+    { id: "talk", label: "Talk" },
     { id: "skills", label: "Skills" },
   ];
 
@@ -631,6 +689,13 @@ export function SuiteDashboard() {
 
                   {open ? (
                     <div className="space-y-3 border-t border-white/10 px-4 py-3">
+                      <Button
+                        size="sm"
+                        className="bg-lime-400 text-zinc-950 hover:bg-lime-300"
+                        onClick={() => openTalk(agent.id)}
+                      >
+                        Talk with {agent.name}
+                      </Button>
                       <div>
                         <p className="font-mono text-sm uppercase tracking-wider text-zinc-400">
                           Playbook / learning
@@ -662,6 +727,106 @@ export function SuiteDashboard() {
                 </article>
               );
             })}
+          </section>
+        ) : null}
+
+        {view === "talk" ? (
+          <section className="grid gap-4 lg:grid-cols-[220px_1fr]">
+            <aside className="space-y-2">
+              <p className="font-mono text-sm uppercase tracking-wider text-zinc-400">
+                Pick an agent
+              </p>
+              {data.agents.map((agent) => (
+                <button
+                  key={agent.id}
+                  type="button"
+                  onClick={() => openTalk(agent.id)}
+                  className={`w-full rounded-xl border px-3 py-3 text-left transition ${
+                    talkAgentId === agent.id
+                      ? "border-lime-400/40 bg-lime-400/10"
+                      : "border-white/10 bg-black/20 hover:border-white/20"
+                  }`}
+                >
+                  <p className="font-medium text-white">{agent.name}</p>
+                  <p className="text-sm text-lime-300">{agent.jobProfile}</p>
+                </button>
+              ))}
+            </aside>
+
+            <div className="flex min-h-[28rem] flex-col rounded-2xl border border-white/10 bg-zinc-950/55">
+              {talkAgent ? (
+                <>
+                  <div className="border-b border-white/10 px-4 py-3">
+                    <h2 className="text-xl font-medium text-white">
+                      {talkAgent.name}
+                    </h2>
+                    <p className="text-base text-zinc-400">
+                      {talkAgent.jobProfile} · ask for status, or{" "}
+                      <span className="text-zinc-300">assign: your task</span>
+                    </p>
+                  </div>
+
+                  <div className="flex-1 space-y-3 overflow-auto p-4 soft-scroll">
+                    {chatMessages.length === 0 ? (
+                      <p className="text-base text-zinc-500">
+                        No messages yet. Try “what’s your status?” or “assign:
+                        draft a short security note”.
+                      </p>
+                    ) : (
+                      chatMessages.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`rounded-xl px-3 py-2 ${
+                            m.role === "user"
+                              ? "ml-8 bg-lime-400/15 text-zinc-100"
+                              : "mr-8 bg-black/35 text-zinc-200"
+                          }`}
+                        >
+                          <p className="font-mono text-xs uppercase tracking-wider text-zinc-500">
+                            {m.role === "user" ? "You" : talkAgent.name}
+                          </p>
+                          <pre className="mt-1 whitespace-pre-wrap font-sans text-base leading-relaxed">
+                            {m.content}
+                          </pre>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <form
+                    onSubmit={sendChat}
+                    className="border-t border-white/10 p-3"
+                  >
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                      <Textarea
+                        value={chatDraft}
+                        onChange={(e) => setChatDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            void sendChat();
+                          }
+                        }}
+                        rows={2}
+                        placeholder={`Message ${talkAgent.name}…`}
+                        className="min-h-[64px] flex-1 border-white/10 bg-black/30 text-base"
+                      />
+                      <Button
+                        type="submit"
+                        disabled={chatBusy || !chatDraft.trim()}
+                        className="bg-lime-400 text-zinc-950 hover:bg-lime-300"
+                      >
+                        Send
+                      </Button>
+                    </div>
+                  </form>
+                </>
+              ) : (
+                <div className="flex flex-1 items-center justify-center p-8 text-center text-zinc-500">
+                  Select an agent to talk with for updates or direct assignments.
+                </div>
+              )}
+            </div>
           </section>
         ) : null}
 

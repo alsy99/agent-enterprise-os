@@ -3,6 +3,7 @@ import { getDb } from "./db";
 import type {
   AgentRecord,
   AgentStatus,
+  ChatMessage,
   Guardrail,
   Handoff,
   MemoryEntry,
@@ -632,4 +633,61 @@ export function setWorkerMeta(key: string, value: string) {
        ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
     )
     .run(key, value);
+}
+
+export function addMessage(input: {
+  agentId: string;
+  role: ChatMessage["role"];
+  content: string;
+  meta?: Record<string, unknown>;
+}): ChatMessage {
+  const message: ChatMessage = {
+    id: uuid(),
+    agentId: input.agentId,
+    role: input.role,
+    content: input.content,
+    meta: input.meta,
+    createdAt: now(),
+  };
+  getDb()
+    .prepare(
+      `INSERT INTO messages (id, agent_id, role, content, meta_json, created_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      message.id,
+      message.agentId,
+      message.role,
+      message.content,
+      message.meta ? JSON.stringify(message.meta) : null,
+      message.createdAt,
+    );
+  return message;
+}
+
+export function listMessages(agentId: string, limit = 80): ChatMessage[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM messages WHERE agent_id = ? ORDER BY created_at ASC LIMIT ?`,
+    )
+    .all(agentId, limit) as Array<{
+    id: string;
+    agent_id: string;
+    role: ChatMessage["role"];
+    content: string;
+    meta_json: string | null;
+    created_at: string;
+  }>;
+  return rows.map((r) => ({
+    id: r.id,
+    agentId: r.agent_id,
+    role: r.role,
+    content: r.content,
+    meta: r.meta_json ? JSON.parse(r.meta_json) : undefined,
+    createdAt: r.created_at,
+  }));
+}
+
+export function listTasksForAgent(agentId: string): Task[] {
+  return listTasks().filter((t) => t.assignedAgentId === agentId);
 }
