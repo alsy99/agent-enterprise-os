@@ -533,7 +533,7 @@ export function SuiteDashboard() {
         ) : null}
 
         {view === "agents" ? (
-          <section className="grid gap-3 sm:grid-cols-2">
+          <section className="grid items-start gap-3 sm:grid-cols-2">
             {data.agents.map((agent) => {
               const open = openAgentId === agent.id;
               return (
