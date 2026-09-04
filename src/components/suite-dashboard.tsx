@@ -270,7 +270,7 @@ export function SuiteDashboard() {
           >
             <p className="mb-3 text-base text-zinc-300">
               Tell Nova what to do — she matches Skills and assigns the team
-              (orchestrator-workers).
+              (orchestrator-workers). Try “introduce all the agents”.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <Textarea
@@ -460,6 +460,38 @@ export function SuiteDashboard() {
                           {cleanBrief(item.objective.description)}
                         </p>
 
+                        {(() => {
+                          const outputTask =
+                            item.tasks.find((t) =>
+                              t.title.toLowerCase().includes("nova answers"),
+                            ) ??
+                            [...item.tasks]
+                              .reverse()
+                              .find(
+                                (t) =>
+                                  t.result &&
+                                  t.requiredCapability !== "learn" &&
+                                  t.status === "completed",
+                              ) ??
+                            item.tasks.find((t) => t.result);
+                          if (!outputTask?.result) return null;
+                          return (
+                            <div className="rounded-xl border border-lime-400/25 bg-lime-400/5 p-4">
+                              <h3 className="font-mono text-sm uppercase tracking-wider text-lime-300">
+                                Output
+                              </h3>
+                              <p className="mt-1 text-sm text-zinc-400">
+                                {outputTask.agent
+                                  ? `${outputTask.agent.name} · ${outputTask.agent.jobProfile}`
+                                  : "Suite"}
+                              </p>
+                              <pre className="mt-3 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-black/40 p-3 font-sans text-base leading-relaxed text-zinc-100 soft-scroll">
+                                {outputTask.result}
+                              </pre>
+                            </div>
+                          );
+                        })()}
+
                         <div>
                           <h3 className="font-mono text-sm uppercase tracking-wider text-zinc-400">
                             Tasks & agents
@@ -591,6 +623,9 @@ export function SuiteDashboard() {
                     <p className="mt-2 font-mono text-base text-zinc-300">
                       {agent.stats.completed} done · {agent.stats.lessons}{" "}
                       lessons
+                    </p>
+                    <p className="mt-2 text-sm text-zinc-500">
+                      Skill-driven suite agent (deterministic runtime)
                     </p>
                   </button>
 

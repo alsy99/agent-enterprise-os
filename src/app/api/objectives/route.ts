@@ -24,8 +24,7 @@ export async function POST(request: Request) {
   ensureSuiteAwake();
   const body = await request.json();
 
-  const brief = String(body.task ?? body.brief ?? body.goal ?? "")
-    .trim();
+  const brief = String(body.task ?? body.brief ?? body.goal ?? "").trim();
 
   if (brief) {
     const objective = submitTaskBrief(brief);
@@ -50,8 +49,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json(
-    { error: "task is required" },
-    { status: 400 },
-  );
+  return NextResponse.json({ error: "task is required" }, { status: 400 });
 }

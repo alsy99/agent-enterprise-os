@@ -25,6 +25,7 @@ import {
 } from "./templates";
 import {
   defaultPipelineSkills,
+  listSkillMetadata,
   loadSkill,
   matchSkillsForBrief,
   skillForCapability,
@@ -332,8 +333,160 @@ export function submitObjective(input: {
   return objective;
 }
 
+function detectDirectIntent(
+  brief: string,
+): "introduce-agents" | "list-skills" | null {
+  const t = brief.toLowerCase();
+  if (
+    /\b(introduce|meet|who\s+are|show|list|present).{0,40}\b(agents?|team|crew|roster)\b/.test(
+      t,
+    ) ||
+    /\b(agents?|team|crew|roster).{0,40}\b(introduce|meet|who|are|you)\b/.test(t)
+  ) {
+    return "introduce-agents";
+  }
+  if (/\b(list|show|what|which).{0,30}\bskills?\b/.test(t)) {
+    return "list-skills";
+  }
+  return null;
+}
+
+function buildAgentIntroduction(): string {
+  const agents = listAgents();
+  const lines = [
+    `# Meet the Agent Suite`,
+    ``,
+    `Nova here — these are the forever-online teammates currently on the roster:`,
+    ``,
+  ];
+  for (const agent of agents) {
+    lines.push(`## ${agent.name} — ${agent.jobProfile}`);
+    lines.push(`Status: ${agent.status}`);
+    lines.push(`Focus: ${agent.capabilities.join(", ")}`);
+    lines.push(`Rules: ${agent.rules.slice(0, 2).join(" · ")}`);
+    if (agent.playbook[0]) {
+      lines.push(`Recent learning: ${agent.playbook[0]}`);
+    }
+    lines.push(``);
+  }
+  lines.push(
+    `How we work: you give me one brief; I match Skills and assign workers (orchestrator-workers).`,
+  );
+  lines.push(
+    `Note: workers are real suite agents (routing, skills, memory, guardrails). Their writing is skill-driven and deterministic unless you plug in an LLM later.`,
+  );
+  return lines.join("\n");
+}
+
+function buildSkillsIntroduction(): string {
+  const skills = listSkillMetadata();
+  const lines = [`# Available Skills`, ``];
+  for (const skill of skills) {
+    lines.push(`## ${skill.name} (\`${skill.capability}\`)`);
+    lines.push(skill.description);
+    lines.push(``);
+  }
+  return lines.join("\n");
+}
+
+/** Meta asks get a direct Nova answer instead of a fake research→build pipeline. */
+function fulfillDirectAnswer(
+  brief: string,
+  intent: "introduce-agents" | "list-skills",
+) {
+  ensureBuiltinAgents();
+  const nova = listAgents().find((a) => a.type === "orchestrator");
+  if (!nova) throw new Error("Nova is offline");
+
+  const title =
+    intent === "introduce-agents"
+      ? "Introduce the agent roster"
+      : "List available skills";
+  const output =
+    intent === "introduce-agents"
+      ? buildAgentIntroduction()
+      : buildSkillsIntroduction();
+
+  const objective = createObjective({
+    title,
+    description: brief.trim(),
+    priority: 3,
+  });
+
+  const task = createTask({
+    objectiveId: objective.id,
+    title: `Nova answers: ${title}`,
+    description: `Direct orchestrator response (no worker pipeline) for: ${brief}`,
+    requiredCapability: "orchestrate",
+  });
+
+  updateAgentStatus(nova.id, "busy");
+  updateTask(task.id, {
+    status: "running",
+    assignedAgentId: nova.id,
+    startedAt: new Date().toISOString(),
+  });
+
+  addMemory({
+    agentId: nova.id,
+    kind: "observation",
+    content: `Decision: answered directly instead of spawning a worker pipeline because the brief is a meta request (${intent}).`,
+    tags: ["decision", "direct-answer", intent],
+    relatedTaskId: task.id,
+    relatedObjectiveId: objective.id,
+    importance: 0.95,
+  });
+
+  updateTask(task.id, {
+    status: "completed",
+    result: output,
+    completedAt: new Date().toISOString(),
+    error: null,
+  });
+  bumpAgentStats(nova.id, "completed");
+
+  const lesson = `${nova.name} learned: meta asks like "${title}" should be answered directly with the live roster/skills — do not run research→build→review for introductions.`;
+  addMemory({
+    agentId: nova.id,
+    kind: "lesson",
+    content: lesson,
+    tags: ["learning", "direct-answer", intent],
+    relatedTaskId: task.id,
+    relatedObjectiveId: objective.id,
+    importance: 0.85,
+  });
+  bumpAgentStats(nova.id, "lessons");
+  const playbook = [lesson, ...nova.playbook.filter((p) => p !== lesson)].slice(
+    0,
+    25,
+  );
+  updateAgentPlaybook(nova.id, playbook);
+
+  updateObjectiveStatus(objective.id, "completed");
+  updateAgentStatus(nova.id, "waiting");
+
+  emitEvent("success", "Nova", `Direct answer ready: ${title}`, {
+    objectiveId: objective.id,
+    pattern: "direct-response",
+  });
+
+  return {
+    ...objective,
+    status: "completed" as const,
+    completedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
+
 export function submitTaskBrief(brief: string) {
   ensureBuiltinAgents();
+  const intent = detectDirectIntent(brief);
+  if (intent) {
+    emitEvent("info", "Nova", `Meta request detected (${intent}) — answering directly`, {
+      intent,
+    });
+    return fulfillDirectAnswer(brief, intent);
+  }
   const plan = planFromBrief(brief);
   emitEvent("info", "Nova", `Interpreting task: "${plan.title}"`, {
     priority: plan.priority,
@@ -367,51 +520,71 @@ function buildWorkProduct(agent: AgentRecord, task: Task, objective: Objective) 
     .join("\n");
   const playbook = agent.playbook.slice(0, 5).map((p) => `- ${p}`).join("\n");
 
-  // Progressive disclosure: skill instructions enter context only for this turn.
   const skillGuidance = skill
     ? skill.instructions.split("\n").slice(0, 24).join("\n")
     : "No bundled skill — follow agent rules and guardrails.";
+
+  const deliverable =
+    agent.type === "researcher"
+      ? [
+          `Brief for "${objective.title}"`,
+          ``,
+          `Goal: ${objective.description}`,
+          `Knowns: suite has ${listAgents().length} online agents; Skills are filesystem-based.`,
+          `Unknowns: anything not stated in the brief.`,
+          `Recommended next: ${skillForCapability("build") ? "implement" : "specialist"} with a minimal first slice.`,
+        ].join("\n")
+      : agent.type === "builder"
+        ? [
+            `First slice for "${objective.title}"`,
+            ``,
+            `1. Restate ask: ${objective.description}`,
+            `2. Concrete steps: clarify acceptance → draft artifact → hand to review`,
+            `3. Artifact outline ready for Sable to validate.`,
+          ].join("\n")
+        : agent.type === "reviewer"
+          ? [
+              `Review of "${objective.title}"`,
+              `Verdict: pass`,
+              `Checked: objective restated, artifact exists, handoff names next owner.`,
+              `Finding: proceed to learn consolidation.`,
+            ].join("\n")
+          : agent.type === "learner"
+            ? `Consolidated lessons for "${objective.title}" into participating agent playbooks.`
+            : [
+                `${agent.name} (${agent.jobProfile}) on "${objective.title}"`,
+                `Capability: ${task.requiredCapability}`,
+                `Produced specialist notes tied to: ${objective.description}`,
+              ].join("\n");
 
   return [
     `## ${task.title}`,
     ``,
     `Agent: ${agent.name} · ${agent.jobProfile}`,
     `Skill: ${skill?.name ?? "ad-hoc"}`,
-    `Pattern hints: ${skill?.patternHints.join(", ") || "worker-turn"}`,
-    `Capability: ${task.requiredCapability}`,
-    `Objective: ${objective.title}`,
     ``,
     `### Decision`,
     `Assigned because this step needs "${task.requiredCapability}" and ${agent.name} covers it.`,
-    `Applied rules: ${agent.rules.slice(0, 2).join("; ")}`,
+    ``,
+    `### Output`,
+    deliverable,
     ``,
     `### Skill guidance (loaded on trigger)`,
     skillGuidance,
-    ``,
-    `### Deliverable`,
-    agent.type === "researcher"
-      ? `Structured brief for "${objective.title}": goals clarified, unknowns listed, recommended build steps prepared.`
-      : agent.type === "builder"
-        ? `Built first slice for "${objective.title}": checklist + implementation notes ready for review.`
-        : agent.type === "reviewer"
-          ? `Review passed with notes (evaluator ready). Criteria checked against objective description.`
-          : agent.type === "learner"
-            ? `Lessons consolidated into playbooks for participating agents.`
-            : agent.type === "orchestrator"
-              ? `Routing decision recorded for "${objective.title}".`
-              : `Specialist output for ${task.requiredCapability} on "${objective.title}".`,
-    ``,
-    playbook ? `### Active playbook\n${playbook}` : "",
-    memories ? `### Recalled context\n${memories}` : "",
+    playbook ? `\n### Active playbook\n${playbook}` : "",
+    memories ? `\n### Recalled context\n${memories}` : "",
   ]
     .filter(Boolean)
     .join("\n");
 }
 
 function learnFromTask(agent: AgentRecord, task: Task, success: boolean) {
+  const objective = listObjectives().find((o) => o.id === task.objectiveId);
+  const objectiveTitle = objective?.title ?? "the objective";
+
   const lesson = success
-    ? `${agent.name} learned: for ${task.requiredCapability} on "${task.title}", lead with constraints from the objective and leave a one-paragraph handoff.`
-    : `${agent.name} learned: ${task.requiredCapability} failed on "${task.title}" — log the blocker and ask Nova to reassign.`;
+    ? `${agent.name} (${agent.jobProfile}) finished "${task.title}" for "${objectiveTitle}". Keep: cite the objective constraints, name the next owner in the handoff, and attach one concrete artifact line.`
+    : `${agent.name} blocked on "${task.title}" for "${objectiveTitle}". Next time: log the exact guardrail/error and ask Nova to reassign ${task.requiredCapability}.`;
 
   addMemory({
     agentId: agent.id,
@@ -430,20 +603,24 @@ function learnFromTask(agent: AgentRecord, task: Task, success: boolean) {
     updateAgentPlaybook(agent.id, playbook.slice(0, 25));
   }
 
-  if (task.requiredCapability === "learn") {
-    const peers = listAgents().filter((a) => a.id !== agent.id);
+  if (task.requiredCapability === "learn" && objective) {
+    const peers = listAgents().filter(
+      (a) =>
+        a.id !== agent.id &&
+        listTasks(objective.id).some((t) => t.assignedAgentId === a.id),
+    );
     for (const peer of peers) {
-      const peerLesson = `${agent.name} → ${peer.name}: keep handoffs explicit for ${peer.jobProfile} work.`;
-      const next = [peerLesson, ...peer.playbook.filter((p) => p !== peerLesson)].slice(
-        0,
-        25,
-      );
+      const peerLesson = `${agent.name} → ${peer.name}: after "${objectiveTitle}", keep handoffs explicit for ${peer.jobProfile} work (what changed + what to do next).`;
+      const next = [
+        peerLesson,
+        ...peer.playbook.filter((p) => p !== peerLesson),
+      ].slice(0, 25);
       updateAgentPlaybook(peer.id, next);
       addMemory({
         agentId: peer.id,
         kind: "lesson",
         content: peerLesson,
-        tags: ["suite-learning", peer.type],
+        tags: ["suite-learning", peer.type, objectiveTitle],
         relatedTaskId: task.id,
         relatedObjectiveId: task.objectiveId,
         importance: 0.6,
