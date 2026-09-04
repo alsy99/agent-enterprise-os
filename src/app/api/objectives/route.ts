@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { ensureSuiteAwake } from "@/lib/suite";
-import { submitObjective, ensureBuiltinAgents } from "@/lib/suite/orchestrator";
+import {
+  ensureBuiltinAgents,
+  submitObjective,
+  submitTaskBrief,
+} from "@/lib/suite/orchestrator";
 import { listObjectives, listTasks } from "@/lib/suite/store";
 
 export const runtime = "nodejs";
@@ -19,25 +23,35 @@ export async function GET() {
 export async function POST(request: Request) {
   ensureSuiteAwake();
   const body = await request.json();
-  const title = String(body.title ?? "").trim();
-  const description = String(body.description ?? "").trim();
-  const priority = Number(body.priority ?? 5);
 
-  if (!title || !description) {
-    return NextResponse.json(
-      { error: "title and description are required" },
-      { status: 400 },
-    );
+  const brief = String(body.task ?? body.brief ?? body.goal ?? "")
+    .trim();
+
+  if (brief) {
+    const objective = submitTaskBrief(brief);
+    return NextResponse.json({
+      objective,
+      tasks: listTasks(objective.id),
+    });
   }
 
-  const objective = submitObjective({
-    title,
-    description,
-    priority: Number.isFinite(priority) ? priority : 5,
-  });
+  // Legacy dual-field support
+  const title = String(body.title ?? "").trim();
+  const description = String(body.description ?? "").trim();
+  if (title && description) {
+    const objective = submitObjective({
+      title,
+      description,
+      priority: Number(body.priority ?? 5),
+    });
+    return NextResponse.json({
+      objective,
+      tasks: listTasks(objective.id),
+    });
+  }
 
-  return NextResponse.json({
-    objective,
-    tasks: listTasks(objective.id),
-  });
+  return NextResponse.json(
+    { error: "task is required" },
+    { status: 400 },
+  );
 }

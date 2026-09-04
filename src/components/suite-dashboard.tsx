@@ -68,8 +68,7 @@ function currentTask(tasks: Task[]) {
 export function SuiteDashboard() {
   const [data, setData] = useState<Snapshot>(empty);
   const [view, setView] = useState<View>("board");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
+  const [task, setTask] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDispatch, setShowDispatch] = useState(false);
@@ -125,14 +124,13 @@ export function SuiteDashboard() {
       const res = await fetch("/api/objectives", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description, priority: 5 }),
+        body: JSON.stringify({ task }),
       });
       if (!res.ok) {
         const body = await res.json();
         throw new Error(body.error || "Failed to create objective");
       }
-      setTitle("");
-      setDescription("");
+      setTask("");
       setShowDispatch(false);
       setView("board");
       await refresh();
@@ -215,28 +213,24 @@ export function SuiteDashboard() {
             onSubmit={submitObjective}
             className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4"
           >
-            <div className="space-y-3">
-              <Input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Objective title"
-                required
-                className="border-white/10 bg-black/30"
-              />
+            <p className="mb-3 text-sm text-zinc-400">
+              Tell Nova what to do — she plans steps and assigns the team.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="What should the suite accomplish? Optional: [cap:docs]"
+                value={task}
+                onChange={(e) => setTask(e.target.value)}
+                placeholder="e.g. Draft a launch checklist with a security pass"
                 required
-                rows={3}
-                className="border-white/10 bg-black/30"
+                rows={2}
+                className="min-h-[64px] flex-1 border-white/10 bg-black/30"
               />
               <Button
                 type="submit"
-                disabled={busy}
-                className="bg-lime-400 text-zinc-950 hover:bg-lime-300"
+                disabled={busy || !task.trim()}
+                className="bg-lime-400 text-zinc-950 hover:bg-lime-300 sm:self-stretch"
               >
-                Queue objective
+                Send to Nova
               </Button>
             </div>
           </form>

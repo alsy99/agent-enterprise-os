@@ -176,41 +176,61 @@ export function decomposeObjective(objective: Objective): Task[] {
   const existing = listTasks(objective.id);
   if (existing.length > 0) return existing;
 
-  const plan = [
+  const brief = `${objective.title} ${objective.description}`.toLowerCase();
+  const plan: Array<{
+    title: string;
+    description: string;
+    requiredCapability: string;
+  }> = [
     {
       title: `Research: ${objective.title}`,
-      description: `Investigate and structure the objective: ${objective.description}`,
+      description: `Nova assigned Kai to investigate: ${objective.description}`,
       requiredCapability: "research",
-    },
-    {
-      title: `Build: ${objective.title}`,
-      description: `Produce the first concrete deliverable for: ${objective.description}`,
-      requiredCapability: "build",
-    },
-    {
-      title: `Review: ${objective.title}`,
-      description: `Validate the deliverable against success criteria for: ${objective.description}`,
-      requiredCapability: "review",
-    },
-    {
-      title: `Learn from: ${objective.title}`,
-      description: `Consolidate lessons and update playbooks after: ${objective.description}`,
-      requiredCapability: "learn",
     },
   ];
 
-  // Detect custom capability hints in the description, e.g. [cap:security]
+  // Explicit [cap:...] or keyword-inferred specialist work
   const hint = objective.description.match(/\[cap:([a-z0-9_-]+)\]/i);
-  if (hint) {
-    const capability = hint[1].toLowerCase();
-    plan.splice(1, 0, {
-      title: `Specialist (${capability}): ${objective.title}`,
-      description: `Handle specialized ${capability} work for: ${objective.description}`,
+  const inferredCaps: string[] = [];
+  if (hint) inferredCaps.push(hint[1].toLowerCase());
+  const keywordCaps: Array<[RegExp, string]> = [
+    [/\b(secur(e|ity)|auth|vulnerabilit|threat)\b/, "security"],
+    [/\b(doc(s|umentation)?|readme|write.?up)\b/, "docs"],
+    [/\b(design|ui|ux|visual)\b/, "design"],
+    [/\b(data|analytics|metric)\b/, "data"],
+    [/\b(test|qa|regress)\b/, "testing"],
+  ];
+  for (const [re, cap] of keywordCaps) {
+    if (re.test(brief) && !inferredCaps.includes(cap)) inferredCaps.push(cap);
+  }
+
+  for (const capability of inferredCaps.slice(0, 2)) {
+    plan.push({
+      title: `${capability} pass: ${objective.title}`,
+      description: `Nova routed specialist work (${capability}): ${objective.description}`,
       requiredCapability: capability,
     });
   }
 
-  return plan.map((p) =>
+  plan.push(
+    {
+      title: `Build: ${objective.title}`,
+      description: `Nova assigned Remy to produce the first slice: ${objective.description}`,
+      requiredCapability: "build",
+    },
+    {
+      title: `Review: ${objective.title}`,
+      description: `Nova assigned Sable to validate: ${objective.description}`,
+      requiredCapability: "review",
+    },
+    {
+      title: `Learn from: ${objective.title}`,
+      description: `Nova assigned Iori to consolidate lessons: ${objective.description}`,
+      requiredCapability: "learn",
+    },
+  );
+
+  const tasks = plan.map((p) =>
     createTask({
       objectiveId: objective.id,
       title: p.title,
@@ -218,6 +238,72 @@ export function decomposeObjective(objective: Objective): Task[] {
       requiredCapability: p.requiredCapability,
     }),
   );
+
+  emitEvent(
+    "info",
+    "Nova",
+    `Planned ${tasks.length} steps for "${objective.title}" → ${plan
+      .map((p) => p.requiredCapability)
+      .join(" → ")}`,
+    { objectiveId: objective.id },
+  );
+
+  return tasks;
+}
+
+/** Nova turns a single user brief into a titled objective + execution plan. */
+export function planFromBrief(brief: string): {
+  title: string;
+  description: string;
+  priority: number;
+} {
+  const cleaned = brief.replace(/\s+/g, " ").trim();
+  const withoutHint = cleaned.replace(/\s*\[cap:[^\]]+\]/gi, "").trim();
+
+  let title = withoutHint;
+  const sentence = withoutHint.split(/[.!?]/)[0]?.trim() ?? withoutHint;
+  if (sentence.length > 0 && sentence.length <= 72) {
+    title = sentence;
+  } else if (withoutHint.length > 72) {
+    title = `${withoutHint.slice(0, 69).trim()}…`;
+  }
+
+  // Capitalize first letter for display
+  title = title.charAt(0).toUpperCase() + title.slice(1);
+
+  let priority = 5;
+  if (/\b(urgent|asap|critical|p0|immediately)\b/i.test(cleaned)) priority = 1;
+  else if (/\b(high priority|important|soon)\b/i.test(cleaned)) priority = 2;
+  else if (/\b(low priority|whenever|someday)\b/i.test(cleaned)) priority = 8;
+
+  return {
+    title,
+    description: cleaned,
+    priority,
+  };
+}
+
+export function submitObjective(input: {
+  title: string;
+  description: string;
+  priority?: number;
+}) {
+  ensureBuiltinAgents();
+  const objective = createObjective(input);
+  decomposeObjective(objective);
+  emitEvent("info", "Nova", `Accepted objective "${objective.title}" and queued the team`, {
+    objectiveId: objective.id,
+  });
+  return objective;
+}
+
+export function submitTaskBrief(brief: string) {
+  ensureBuiltinAgents();
+  const plan = planFromBrief(brief);
+  emitEvent("info", "Nova", `Interpreting task: "${plan.title}"`, {
+    priority: plan.priority,
+  });
+  return submitObjective(plan);
 }
 
 function checkGuardrails(agent: AgentRecord, task: Task): string | null {
@@ -512,18 +598,4 @@ export function orchestrateTick(): {
     spawned: Math.max(0, spawned),
     heartbeats: listAgents().length,
   };
-}
-
-export function submitObjective(input: {
-  title: string;
-  description: string;
-  priority?: number;
-}) {
-  ensureBuiltinAgents();
-  const objective = createObjective(input);
-  decomposeObjective(objective);
-  emitEvent("info", "orchestrator", `Queued objective pipeline for "${objective.title}"`, {
-    objectiveId: objective.id,
-  });
-  return objective;
 }
