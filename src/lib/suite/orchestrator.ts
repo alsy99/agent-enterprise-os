@@ -23,6 +23,13 @@ import {
   BUILTIN_SPECS,
   inventSpecForCapability,
 } from "./templates";
+import {
+  defaultPipelineSkills,
+  loadSkill,
+  matchSkillsForBrief,
+  skillForCapability,
+  type SkillMetadata,
+} from "./skills";
 import type { AgentRecord, Objective, Task } from "./types";
 
 function agentCovers(agent: AgentRecord, capability: string) {
@@ -176,59 +183,66 @@ export function decomposeObjective(objective: Objective): Task[] {
   const existing = listTasks(objective.id);
   if (existing.length > 0) return existing;
 
-  const brief = `${objective.title} ${objective.description}`.toLowerCase();
-  const plan: Array<{
-    title: string;
-    description: string;
-    requiredCapability: string;
-  }> = [
-    {
-      title: `Research: ${objective.title}`,
-      description: `Nova assigned Kai to investigate: ${objective.description}`,
-      requiredCapability: "research",
-    },
-  ];
+  ensureBuiltinAgents();
 
-  // Explicit [cap:...] or keyword-inferred specialist work
-  const hint = objective.description.match(/\[cap:([a-z0-9_-]+)\]/i);
-  const inferredCaps: string[] = [];
-  if (hint) inferredCaps.push(hint[1].toLowerCase());
-  const keywordCaps: Array<[RegExp, string]> = [
-    [/\b(secur(e|ity)|auth|vulnerabilit|threat)\b/, "security"],
-    [/\b(doc(s|umentation)?|readme|write.?up)\b/, "docs"],
-    [/\b(design|ui|ux|visual)\b/, "design"],
-    [/\b(data|analytics|metric)\b/, "data"],
-    [/\b(test|qa|regress)\b/, "testing"],
-  ];
-  for (const [re, cap] of keywordCaps) {
-    if (re.test(brief) && !inferredCaps.includes(cap)) inferredCaps.push(cap);
-  }
+  // Level 2: load Nova skill instructions only while planning.
+  const novaSkill = loadSkill("nova-orchestrate");
+  const brief = `${objective.title}\n${objective.description}`;
 
-  for (const capability of inferredCaps.slice(0, 2)) {
-    plan.push({
-      title: `${capability} pass: ${objective.title}`,
-      description: `Nova routed specialist work (${capability}): ${objective.description}`,
-      requiredCapability: capability,
-    });
-  }
-
-  plan.push(
-    {
-      title: `Build: ${objective.title}`,
-      description: `Nova assigned Remy to produce the first slice: ${objective.description}`,
-      requiredCapability: "build",
-    },
-    {
-      title: `Review: ${objective.title}`,
-      description: `Nova assigned Sable to validate: ${objective.description}`,
-      requiredCapability: "review",
-    },
-    {
-      title: `Learn from: ${objective.title}`,
-      description: `Nova assigned Iori to consolidate lessons: ${objective.description}`,
-      requiredCapability: "learn",
-    },
+  // Level 1 discovery via skill descriptions (what + when).
+  const matched = matchSkillsForBrief(brief).filter(
+    (s) => s.id !== "nova-orchestrate",
   );
+  const pipeline = defaultPipelineSkills();
+
+  const coreOrder = ["research", "build", "review", "learn"];
+  const specialists = matched
+    .map((s) => s.capability)
+    .filter((cap) => !coreOrder.includes(cap));
+
+  const hint = objective.description.match(/\[cap:([a-z0-9_-]+)\]/i);
+  if (hint) {
+    const capability = hint[1].toLowerCase();
+    if (!specialists.includes(capability) && !coreOrder.includes(capability)) {
+      specialists.push(capability);
+    }
+  }
+
+  const orderedCaps = [
+    "research",
+    ...specialists.slice(0, 2),
+    "build",
+    "review",
+    "learn",
+  ];
+
+  const skillByCap = new Map<string, SkillMetadata>();
+  for (const s of [...pipeline, ...matched]) {
+    skillByCap.set(s.capability, s);
+  }
+  if (hint) {
+    const capability = hint[1].toLowerCase();
+    const existingSkill = skillForCapability(capability);
+    if (existingSkill) skillByCap.set(capability, existingSkill);
+  }
+
+  const plan = orderedCaps.map((capability) => {
+    const skill = skillByCap.get(capability);
+    const skillName = skill?.name ?? capability;
+    return {
+      title: `${skillName}: ${objective.title}`,
+      description: [
+        `Nova (orchestrator-workers) routed this step via skill "${skillName}".`,
+        `Capability: ${capability}.`,
+        `Objective: ${objective.description}`,
+        skill?.description ? `When-to-use: ${skill.description}` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
+      requiredCapability: capability,
+      skillId: skill?.id,
+    };
+  });
 
   const tasks = plan.map((p) =>
     createTask({
@@ -239,14 +253,35 @@ export function decomposeObjective(objective: Objective): Task[] {
     }),
   );
 
+  const rationale = plan
+    .map((p) => `${p.requiredCapability}${p.skillId ? `@${p.skillId}` : ""}`)
+    .join(" → ");
+
   emitEvent(
     "info",
     "Nova",
-    `Planned ${tasks.length} steps for "${objective.title}" → ${plan
-      .map((p) => p.requiredCapability)
-      .join(" → ")}`,
-    { objectiveId: objective.id },
+    `Orchestrator-workers plan for "${objective.title}": ${rationale}`,
+    {
+      objectiveId: objective.id,
+      pattern: "orchestrator-workers",
+      skills: plan.map((p) => p.skillId).filter(Boolean),
+      novaSkillLoaded: Boolean(novaSkill),
+    },
   );
+
+  const nova = listAgents().find((a) => a.type === "orchestrator");
+  if (nova) {
+    addMemory({
+      agentId: nova.id,
+      kind: "observation",
+      content: `Decision (transparent plan): ${rationale}. Matched skills: ${
+        matched.map((m) => m.name).join(", ") || "default pipeline"
+      }.`,
+      tags: ["decision", "plan", "orchestrator-workers"],
+      relatedObjectiveId: objective.id,
+      importance: 0.9,
+    });
+  }
 
   return tasks;
 }
@@ -325,15 +360,24 @@ function checkGuardrails(agent: AgentRecord, task: Task): string | null {
 }
 
 function buildWorkProduct(agent: AgentRecord, task: Task, objective: Objective) {
+  const skillMeta = skillForCapability(task.requiredCapability);
+  const skill = skillMeta ? loadSkill(skillMeta.id) : null;
   const memories = listMemories(agent.id, 5)
     .map((m) => `- (${m.kind}) ${m.content}`)
     .join("\n");
   const playbook = agent.playbook.slice(0, 5).map((p) => `- ${p}`).join("\n");
 
+  // Progressive disclosure: skill instructions enter context only for this turn.
+  const skillGuidance = skill
+    ? skill.instructions.split("\n").slice(0, 24).join("\n")
+    : "No bundled skill — follow agent rules and guardrails.";
+
   return [
     `## ${task.title}`,
     ``,
     `Agent: ${agent.name} · ${agent.jobProfile}`,
+    `Skill: ${skill?.name ?? "ad-hoc"}`,
+    `Pattern hints: ${skill?.patternHints.join(", ") || "worker-turn"}`,
     `Capability: ${task.requiredCapability}`,
     `Objective: ${objective.title}`,
     ``,
@@ -341,13 +385,16 @@ function buildWorkProduct(agent: AgentRecord, task: Task, objective: Objective) 
     `Assigned because this step needs "${task.requiredCapability}" and ${agent.name} covers it.`,
     `Applied rules: ${agent.rules.slice(0, 2).join("; ")}`,
     ``,
+    `### Skill guidance (loaded on trigger)`,
+    skillGuidance,
+    ``,
     `### Deliverable`,
     agent.type === "researcher"
       ? `Structured brief for "${objective.title}": goals clarified, unknowns listed, recommended build steps prepared.`
       : agent.type === "builder"
         ? `Built first slice for "${objective.title}": checklist + implementation notes ready for review.`
         : agent.type === "reviewer"
-          ? `Review passed with notes. Criteria checked against objective description. Ready for learning consolidation.`
+          ? `Review passed with notes (evaluator ready). Criteria checked against objective description.`
           : agent.type === "learner"
             ? `Lessons consolidated into playbooks for participating agents.`
             : agent.type === "orchestrator"

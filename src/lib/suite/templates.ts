@@ -55,7 +55,7 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You are Nova, Chief Orchestrator. Keep agents online, route work fairly, and create specialists when capability gaps appear.",
+      "You are Nova, Chief Orchestrator. Use the nova-orchestrate skill and Anthropic orchestrator-workers pattern: keep plans simple, show your routing decisions, load worker skills only when triggered, and prefer existing agents over spawning.",
     maxConcurrency: 1,
   },
   {
@@ -78,7 +78,7 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You are Kai, Research Analyst. Structure problems so other agents can execute with confidence.",
+      "You are Kai, Research Analyst. When triggered, follow the research skill: structure problems, mark unknowns, and hand off actionable next steps.",
     maxConcurrency: 2,
   },
   {
@@ -101,7 +101,7 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You are Remy, Implementation Engineer. Turn assigned tasks into concrete deliverables and leave clean handoff context.",
+      "You are Remy, Implementation Engineer. When triggered, follow the implement skill: ship the smallest complete slice and leave a clean handoff.",
     maxConcurrency: 2,
   },
   {
@@ -124,7 +124,7 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You are Sable, Quality Reviewer. Validate work quality, enforce guardrails, and write lasting lessons.",
+      "You are Sable, Quality Reviewer. When triggered, follow the review skill (evaluator-optimizer): validate against criteria and request rework instead of rubber-stamping.",
     maxConcurrency: 2,
   },
   {
@@ -147,7 +147,7 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You are Iori, Learning Strategist. Turn raw memories into durable playbook improvements.",
+      "You are Iori, Learning Strategist. When triggered, follow the learn skill: consolidate memories into short playbook updates.",
     maxConcurrency: 1,
   },
 ];

@@ -39,11 +39,19 @@ type HistoryItem = {
   events: SuiteEvent[];
 };
 
+type SkillMeta = {
+  id: string;
+  name: string;
+  description: string;
+  capability: string;
+};
+
 type Snapshot = {
   worker: WorkerState;
   objectives: ObjectiveWithTasks[];
   agents: AgentRecord[];
   history: HistoryItem[];
+  skills: SkillMeta[];
 };
 
 const empty: Snapshot = {
@@ -51,9 +59,10 @@ const empty: Snapshot = {
   objectives: [],
   agents: [],
   history: [],
+  skills: [],
 };
 
-type View = "board" | "history" | "agents";
+type View = "board" | "history" | "agents" | "skills";
 
 function statusTone(status: string) {
   switch (status) {
@@ -107,21 +116,25 @@ export function SuiteDashboard() {
 
   const refresh = useCallback(async () => {
     try {
-      const [workerRes, objRes, agentRes, historyRes] = await Promise.all([
-        fetch("/api/worker", { cache: "no-store" }),
-        fetch("/api/objectives", { cache: "no-store" }),
-        fetch("/api/agents", { cache: "no-store" }),
-        fetch("/api/history", { cache: "no-store" }),
-      ]);
+      const [workerRes, objRes, agentRes, historyRes, skillsRes] =
+        await Promise.all([
+          fetch("/api/worker", { cache: "no-store" }),
+          fetch("/api/objectives", { cache: "no-store" }),
+          fetch("/api/agents", { cache: "no-store" }),
+          fetch("/api/history", { cache: "no-store" }),
+          fetch("/api/skills", { cache: "no-store" }),
+        ]);
       const workerJson = await workerRes.json();
       const objJson = await objRes.json();
       const agentJson = await agentRes.json();
       const historyJson = await historyRes.json();
+      const skillsJson = await skillsRes.json();
       setData({
         worker: workerJson.worker,
         objectives: objJson.objectives ?? [],
         agents: agentJson.agents ?? [],
         history: historyJson.history ?? [],
+        skills: skillsJson.skills ?? [],
       });
       setError(null);
     } catch (e) {
@@ -194,6 +207,7 @@ export function SuiteDashboard() {
     { id: "board", label: "Ongoing" },
     { id: "history", label: "History" },
     { id: "agents", label: "Agents" },
+    { id: "skills", label: "Skills" },
   ];
 
   return (
@@ -255,7 +269,8 @@ export function SuiteDashboard() {
             className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4"
           >
             <p className="mb-3 text-base text-zinc-300">
-              Tell Nova what to do — she plans steps and assigns the team.
+              Tell Nova what to do — she matches Skills and assigns the team
+              (orchestrator-workers).
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <Textarea
@@ -604,6 +619,43 @@ export function SuiteDashboard() {
                 </article>
               );
             })}
+          </section>
+        ) : null}
+
+        {view === "skills" ? (
+          <section className="space-y-3">
+            <p className="text-base text-zinc-400">
+              Filesystem Skills with progressive disclosure — Nova sees names +
+              descriptions at plan time; full instructions load only when a step
+              runs.
+            </p>
+            {data.skills.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/15 px-5 py-10 text-center text-zinc-400">
+                No skills found in /skills
+              </div>
+            ) : (
+              data.skills.map((skill) => (
+                <article
+                  key={skill.id}
+                  className="rounded-2xl border border-white/10 bg-zinc-950/55 p-5"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="text-xl font-medium text-white">
+                      {skill.name}
+                    </h2>
+                    <Badge
+                      variant="outline"
+                      className="border-sky-400/30 bg-sky-400/10 text-sky-200"
+                    >
+                      {skill.capability}
+                    </Badge>
+                  </div>
+                  <p className="mt-3 text-base leading-relaxed text-zinc-300">
+                    {skill.description}
+                  </p>
+                </article>
+              ))
+            )}
           </section>
         ) : null}
       </main>
