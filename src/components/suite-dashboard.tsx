@@ -1,33 +1,59 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import type {
   AgentRecord,
+  Handoff,
+  MemoryEntry,
   Objective,
+  SuiteEvent,
   Task,
   WorkerState,
 } from "@/lib/suite/types";
 
 type ObjectiveWithTasks = Objective & { tasks: Task[] };
 
+type HistoryTask = Task & {
+  agent: { id: string; name: string; jobProfile: string } | null;
+  decisions: MemoryEntry[];
+  learnings: MemoryEntry[];
+};
+
+type HistoryItem = {
+  objective: Objective;
+  tasks: HistoryTask[];
+  participants: Array<{ id: string; name: string; jobProfile: string }>;
+  handoffs: Array<
+    Handoff & {
+      from: { name: string; jobProfile: string } | null;
+      to: { name: string; jobProfile: string } | null;
+    }
+  >;
+  learnings: MemoryEntry[];
+  decisions: MemoryEntry[];
+  events: SuiteEvent[];
+};
+
 type Snapshot = {
   worker: WorkerState;
   objectives: ObjectiveWithTasks[];
   agents: AgentRecord[];
+  history: HistoryItem[];
 };
 
 const empty: Snapshot = {
   worker: { running: false, ticks: 0, mode: "embedded" },
   objectives: [],
   agents: [],
+  history: [],
 };
 
-type View = "board" | "agents";
+type View = "board" | "history" | "agents";
 
 function statusTone(status: string) {
   switch (status) {
@@ -65,6 +91,10 @@ function currentTask(tasks: Task[]) {
   );
 }
 
+function cleanBrief(text: string) {
+  return text.replace(/\s*\[cap:[^\]]+\]/gi, "");
+}
+
 export function SuiteDashboard() {
   const [data, setData] = useState<Snapshot>(empty);
   const [view, setView] = useState<View>("board");
@@ -72,21 +102,26 @@ export function SuiteDashboard() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDispatch, setShowDispatch] = useState(false);
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
+  const [openAgentId, setOpenAgentId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [workerRes, objRes, agentRes] = await Promise.all([
+      const [workerRes, objRes, agentRes, historyRes] = await Promise.all([
         fetch("/api/worker", { cache: "no-store" }),
         fetch("/api/objectives", { cache: "no-store" }),
         fetch("/api/agents", { cache: "no-store" }),
+        fetch("/api/history", { cache: "no-store" }),
       ]);
       const workerJson = await workerRes.json();
       const objJson = await objRes.json();
       const agentJson = await agentRes.json();
+      const historyJson = await historyRes.json();
       setData({
         worker: workerJson.worker,
         objectives: objJson.objectives ?? [],
         agents: agentJson.agents ?? [],
+        history: historyJson.history ?? [],
       });
       setError(null);
     } catch (e) {
@@ -154,6 +189,12 @@ export function SuiteDashboard() {
       setBusy(false);
     }
   }
+
+  const tabs: Array<{ id: View; label: string }> = [
+    { id: "board", label: "Ongoing" },
+    { id: "history", label: "History" },
+    { id: "agents", label: "Agents" },
+  ];
 
   return (
     <div className="relative min-h-screen overflow-hidden text-zinc-100">
@@ -236,31 +277,25 @@ export function SuiteDashboard() {
           </form>
         ) : null}
 
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant={view === "board" ? "default" : "outline"}
-            onClick={() => setView("board")}
-            className={
-              view === "board"
-                ? "bg-white text-zinc-950"
-                : "border-white/15 bg-transparent"
-            }
-          >
-            Ongoing
-          </Button>
-          <Button
-            size="sm"
-            variant={view === "agents" ? "default" : "outline"}
-            onClick={() => setView("agents")}
-            className={
-              view === "agents"
-                ? "bg-white text-zinc-950"
-                : "border-white/15 bg-transparent"
-            }
-          >
-            Agents
-          </Button>
+        <div className="flex flex-wrap gap-2">
+          {tabs.map((tab) => (
+            <Button
+              key={tab.id}
+              size="sm"
+              variant={view === tab.id ? "default" : "outline"}
+              onClick={() => setView(tab.id)}
+              className={
+                view === tab.id
+                  ? "bg-white text-zinc-950"
+                  : "border-white/15 bg-transparent"
+              }
+            >
+              {tab.label}
+              {tab.id === "history" && data.history.length > 0
+                ? ` (${data.history.length})`
+                : ""}
+            </Button>
+          ))}
         </div>
 
         {view === "board" ? (
@@ -269,7 +304,7 @@ export function SuiteDashboard() {
               <div className="rounded-2xl border border-dashed border-white/15 bg-zinc-950/40 px-5 py-12 text-center">
                 <p className="text-zinc-300">No ongoing work</p>
                 <p className="mt-1 text-sm text-zinc-500">
-                  Queue an objective to put the suite to work.
+                  Queue an objective, or open History for completed work.
                 </p>
               </div>
             ) : (
@@ -294,7 +329,7 @@ export function SuiteDashboard() {
                           {objective.title}
                         </h2>
                         <p className="mt-1 line-clamp-2 text-sm text-zinc-400">
-                          {objective.description.replace(/\s*\[cap:[^\]]+\]/gi, "")}
+                          {cleanBrief(objective.description)}
                         </p>
                       </div>
                       <Badge
@@ -333,13 +368,13 @@ export function SuiteDashboard() {
                     ) : null}
 
                     <div className="mt-4 flex flex-wrap gap-2">
-                      {objective.tasks.map((task) => (
+                      {objective.tasks.map((t) => (
                         <Badge
-                          key={task.id}
+                          key={t.id}
                           variant="outline"
-                          className={statusTone(task.status)}
+                          className={statusTone(t.status)}
                         >
-                          {task.requiredCapability}
+                          {t.requiredCapability}
                         </Badge>
                       ))}
                     </div>
@@ -348,39 +383,229 @@ export function SuiteDashboard() {
               })
             )}
           </section>
-        ) : (
-          <section className="grid gap-3 sm:grid-cols-2">
-            {data.agents.map((agent) => (
-              <article
-                key={agent.id}
-                className="rounded-2xl border border-white/10 bg-zinc-950/55 p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-medium text-white">
-                      {agent.name}
-                    </h2>
-                    <p className="mt-0.5 text-sm text-lime-300/90">
-                      {agent.jobProfile}
-                    </p>
-                  </div>
-                  <Badge
-                    variant="outline"
-                    className={statusTone(agent.status)}
+        ) : null}
+
+        {view === "history" ? (
+          <section className="space-y-3">
+            {data.history.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/15 bg-zinc-950/40 px-5 py-12 text-center">
+                <p className="text-zinc-300">No completed objectives yet</p>
+              </div>
+            ) : (
+              data.history.map((item) => {
+                const open = openHistoryId === item.objective.id;
+                return (
+                  <article
+                    key={item.objective.id}
+                    className="rounded-2xl border border-white/10 bg-zinc-950/55"
                   >
-                    {agent.status}
-                  </Badge>
-                </div>
-                <p className="mt-3 text-xs text-zinc-500">
-                  {agent.capabilities.slice(0, 4).join(" · ")}
-                </p>
-                <p className="mt-2 font-mono text-[11px] text-zinc-600">
-                  {agent.stats.completed} done · {agent.stats.lessons} lessons
-                </p>
-              </article>
-            ))}
+                    <button
+                      type="button"
+                      className="flex w-full items-start justify-between gap-3 p-5 text-left"
+                      onClick={() =>
+                        setOpenHistoryId(open ? null : item.objective.id)
+                      }
+                    >
+                      <div>
+                        <h2 className="text-lg font-medium text-white">
+                          {item.objective.title}
+                        </h2>
+                        <p className="mt-1 text-sm text-zinc-500">
+                          {item.participants
+                            .map((p) => `${p.name} (${p.jobProfile})`)
+                            .join(" · ") || "No agents recorded"}
+                        </p>
+                        <p className="mt-2 font-mono text-[11px] text-zinc-600">
+                          {item.tasks.filter((t) => t.status === "completed").length}{" "}
+                          tasks · {item.learnings.length} lessons
+                          {item.objective.completedAt
+                            ? ` · ${formatDistanceToNow(new Date(item.objective.completedAt), { addSuffix: true })}`
+                            : ""}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={statusTone(item.objective.status)}
+                      >
+                        {item.objective.status}
+                      </Badge>
+                    </button>
+
+                    {open ? (
+                      <div className="space-y-4 border-t border-white/10 px-5 py-4">
+                        <p className="text-sm text-zinc-400">
+                          {cleanBrief(item.objective.description)}
+                        </p>
+
+                        <div>
+                          <h3 className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                            Tasks & agents
+                          </h3>
+                          <div className="mt-2 space-y-2">
+                            {item.tasks.map((t) => (
+                              <div
+                                key={t.id}
+                                className="rounded-xl border border-white/8 bg-black/25 px-3 py-3"
+                              >
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <p className="text-sm text-zinc-200">
+                                    {t.title}
+                                  </p>
+                                  <Badge
+                                    variant="outline"
+                                    className={statusTone(t.status)}
+                                  >
+                                    {t.status}
+                                  </Badge>
+                                </div>
+                                <p className="mt-1 text-xs text-lime-300/80">
+                                  {t.agent
+                                    ? `${t.agent.name} · ${t.agent.jobProfile}`
+                                    : "Unassigned"}
+                                </p>
+
+                                {t.decisions[0] ? (
+                                  <p className="mt-2 text-xs text-zinc-400">
+                                    <span className="text-zinc-500">Why: </span>
+                                    {t.decisions[0].content}
+                                  </p>
+                                ) : null}
+
+                                {t.learnings[0] ? (
+                                  <p className="mt-1 text-xs text-zinc-400">
+                                    <span className="text-zinc-500">
+                                      Learned:{" "}
+                                    </span>
+                                    {t.learnings[0].content}
+                                  </p>
+                                ) : null}
+
+                                {t.result ? (
+                                  <details className="mt-2">
+                                    <summary className="cursor-pointer text-xs text-zinc-500">
+                                      Deliverable
+                                    </summary>
+                                    <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 font-mono text-[11px] text-zinc-400">
+                                      {t.result}
+                                    </pre>
+                                  </details>
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        {item.handoffs.length > 0 ? (
+                          <div>
+                            <h3 className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                              Handoffs
+                            </h3>
+                            <ul className="mt-2 space-y-1 text-sm text-zinc-400">
+                              {item.handoffs.map((h) => (
+                                <li key={h.id}>
+                                  {h.from?.name ?? "?"} → {h.to?.name ?? "?"} —{" "}
+                                  {h.summary}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+
+                        {item.learnings.length > 0 ? (
+                          <div>
+                            <h3 className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                              Lessons from this run
+                            </h3>
+                            <ul className="mt-2 space-y-1 text-sm text-zinc-400">
+                              {item.learnings.map((l) => (
+                                <li key={l.id}>• {l.content}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
+                  </article>
+                );
+              })
+            )}
           </section>
-        )}
+        ) : null}
+
+        {view === "agents" ? (
+          <section className="grid gap-3 sm:grid-cols-2">
+            {data.agents.map((agent) => {
+              const open = openAgentId === agent.id;
+              return (
+                <article
+                  key={agent.id}
+                  className="rounded-2xl border border-white/10 bg-zinc-950/55"
+                >
+                  <button
+                    type="button"
+                    className="w-full p-4 text-left"
+                    onClick={() => setOpenAgentId(open ? null : agent.id)}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-medium text-white">
+                          {agent.name}
+                        </h2>
+                        <p className="mt-0.5 text-sm text-lime-300/90">
+                          {agent.jobProfile}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="outline"
+                        className={statusTone(agent.status)}
+                      >
+                        {agent.status}
+                      </Badge>
+                    </div>
+                    <p className="mt-3 text-xs text-zinc-500">
+                      {agent.capabilities.slice(0, 4).join(" · ")}
+                    </p>
+                    <p className="mt-2 font-mono text-[11px] text-zinc-600">
+                      {agent.stats.completed} done · {agent.stats.lessons}{" "}
+                      lessons
+                    </p>
+                  </button>
+
+                  {open ? (
+                    <div className="space-y-3 border-t border-white/10 px-4 py-3">
+                      <div>
+                        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                          Playbook / learning
+                        </p>
+                        <ul className="mt-2 space-y-1 text-xs text-zinc-400">
+                          {agent.playbook.length === 0 ? (
+                            <li>No lessons yet</li>
+                          ) : (
+                            agent.playbook.slice(0, 6).map((p) => (
+                              <li key={p}>• {p}</li>
+                            ))
+                          )}
+                        </ul>
+                      </div>
+                      <div>
+                        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                          Guardrails
+                        </p>
+                        <ul className="mt-2 space-y-1 text-xs text-zinc-400">
+                          {agent.guardrails.slice(0, 3).map((g) => (
+                            <li key={g.id}>
+                              • [{g.severity}] {g.rule}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  ) : null}
+                </article>
+              );
+            })}
+          </section>
+        ) : null}
       </main>
     </div>
   );

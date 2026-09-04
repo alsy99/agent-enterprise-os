@@ -480,6 +480,73 @@ export function listMemories(agentId?: string, limit = 50): MemoryEntry[] {
   }));
 }
 
+export function listMemoriesForObjective(
+  objectiveId: string,
+  limit = 100,
+): MemoryEntry[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM memories WHERE related_objective_id = ? ORDER BY created_at ASC LIMIT ?`,
+    )
+    .all(objectiveId, limit) as Array<Record<string, unknown>>;
+
+  return rows.map((r) => ({
+    id: r.id as string,
+    agentId: r.agent_id as string,
+    kind: r.kind as MemoryEntry["kind"],
+    content: r.content as string,
+    tags: JSON.parse(r.tags_json as string),
+    relatedTaskId: (r.related_task_id as string) || undefined,
+    relatedObjectiveId: (r.related_objective_id as string) || undefined,
+    createdAt: r.created_at as string,
+    importance: r.importance as number,
+  }));
+}
+
+export function listHandoffsForObjective(objectiveId: string): Handoff[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM handoffs WHERE objective_id = ? ORDER BY created_at ASC`,
+    )
+    .all(objectiveId) as Array<Record<string, unknown>>;
+  return rows.map((r) => ({
+    id: r.id as string,
+    fromAgentId: r.from_agent_id as string,
+    toAgentId: r.to_agent_id as string,
+    taskId: r.task_id as string,
+    objectiveId: r.objective_id as string,
+    summary: r.summary as string,
+    context: JSON.parse(r.context_json as string),
+    status: r.status as Handoff["status"],
+    createdAt: r.created_at as string,
+    acceptedAt: (r.accepted_at as string) || undefined,
+  }));
+}
+
+export function listEventsForObjective(objectiveId: string, limit = 40): SuiteEvent[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT * FROM events WHERE meta_json LIKE ? ORDER BY created_at ASC LIMIT ?`,
+    )
+    .all(`%"objectiveId":"${objectiveId}"%`, limit) as Array<{
+    id: string;
+    level: SuiteEvent["level"];
+    source: string;
+    message: string;
+    meta_json: string | null;
+    created_at: string;
+  }>;
+
+  return rows.map((r) => ({
+    id: r.id,
+    level: r.level,
+    source: r.source,
+    message: r.message,
+    meta: r.meta_json ? JSON.parse(r.meta_json) : undefined,
+    createdAt: r.created_at,
+  }));
+}
+
 export function createHandoff(input: {
   fromAgentId: string;
   toAgentId: string;

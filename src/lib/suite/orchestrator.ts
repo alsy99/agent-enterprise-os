@@ -333,14 +333,13 @@ function buildWorkProduct(agent: AgentRecord, task: Task, objective: Objective) 
   return [
     `## ${task.title}`,
     ``,
-    `Agent: ${agent.name} (${agent.type})`,
+    `Agent: ${agent.name} · ${agent.jobProfile}`,
     `Capability: ${task.requiredCapability}`,
     `Objective: ${objective.title}`,
     ``,
-    `### Actions`,
-    `1. Applied rules: ${agent.rules.slice(0, 2).join("; ")}`,
-    `2. Consulted ${listMemories(agent.id, 5).length} prior memories`,
-    `3. Produced a durable artifact for the next agent`,
+    `### Decision`,
+    `Assigned because this step needs "${task.requiredCapability}" and ${agent.name} covers it.`,
+    `Applied rules: ${agent.rules.slice(0, 2).join("; ")}`,
     ``,
     `### Deliverable`,
     agent.type === "researcher"
@@ -351,7 +350,9 @@ function buildWorkProduct(agent: AgentRecord, task: Task, objective: Objective) 
           ? `Review passed with notes. Criteria checked against objective description. Ready for learning consolidation.`
           : agent.type === "learner"
             ? `Lessons consolidated into playbooks for participating agents.`
-            : `Specialist output for ${task.requiredCapability} on "${objective.title}".`,
+            : agent.type === "orchestrator"
+              ? `Routing decision recorded for "${objective.title}".`
+              : `Specialist output for ${task.requiredCapability} on "${objective.title}".`,
     ``,
     playbook ? `### Active playbook\n${playbook}` : "",
     memories ? `### Recalled context\n${memories}` : "",
@@ -362,14 +363,14 @@ function buildWorkProduct(agent: AgentRecord, task: Task, objective: Objective) 
 
 function learnFromTask(agent: AgentRecord, task: Task, success: boolean) {
   const lesson = success
-    ? `Succeeded on ${task.requiredCapability}: keep concise handoffs and cite objective constraints early.`
-    : `Failed on ${task.requiredCapability}: capture blockers immediately and request reassignment.`;
+    ? `${agent.name} learned: for ${task.requiredCapability} on "${task.title}", lead with constraints from the objective and leave a one-paragraph handoff.`
+    : `${agent.name} learned: ${task.requiredCapability} failed on "${task.title}" — log the blocker and ask Nova to reassign.`;
 
   addMemory({
     agentId: agent.id,
     kind: "lesson",
     content: lesson,
-    tags: [task.requiredCapability, success ? "success" : "failure"],
+    tags: [task.requiredCapability, success ? "success" : "failure", "learning"],
     relatedTaskId: task.id,
     relatedObjectiveId: task.objectiveId,
     importance: success ? 0.7 : 0.9,
@@ -382,11 +383,10 @@ function learnFromTask(agent: AgentRecord, task: Task, success: boolean) {
     updateAgentPlaybook(agent.id, playbook.slice(0, 25));
   }
 
-  // Learner also improves peer playbooks on learn tasks
   if (task.requiredCapability === "learn") {
     const peers = listAgents().filter((a) => a.id !== agent.id);
     for (const peer of peers) {
-      const peerLesson = `From suite reflection: prioritize clear handoffs for ${peer.type} work.`;
+      const peerLesson = `${agent.name} → ${peer.name}: keep handoffs explicit for ${peer.jobProfile} work.`;
       const next = [peerLesson, ...peer.playbook.filter((p) => p !== peerLesson)].slice(
         0,
         25,
@@ -434,11 +434,11 @@ export function executeTask(task: Task): void {
   addMemory({
     agentId: agent.id,
     kind: "observation",
-    content: `Started task "${task.title}" for objective "${objective.title}"`,
-    tags: ["start", task.requiredCapability],
+    content: `Decision: Nova assigned ${agent.name} (${agent.jobProfile}) because this step requires "${task.requiredCapability}". Why: ${agent.name} is available and covers that capability under suite rules.`,
+    tags: ["decision", "assignment", task.requiredCapability],
     relatedTaskId: task.id,
     relatedObjectiveId: objective.id,
-    importance: 0.4,
+    importance: 0.75,
   });
 
   try {
