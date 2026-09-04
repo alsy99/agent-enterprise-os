@@ -276,6 +276,14 @@ export function SuiteDashboard() {
               <Textarea
                 value={task}
                 onChange={(e) => setTask(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!busy && task.trim()) {
+                      e.currentTarget.form?.requestSubmit();
+                    }
+                  }
+                }}
                 placeholder="e.g. Draft a launch checklist with a security pass"
                 required
                 rows={2}
