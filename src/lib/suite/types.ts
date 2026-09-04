@@ -45,9 +45,26 @@ export const AgentSpecSchema = z.object({
   rules: z.array(z.string()),
   guardrails: z.array(GuardrailSchema),
   systemPrompt: z.string(),
+  personality: z.object({
+    archetype: z.string(),
+    traits: z.array(z.string()),
+    voice: z.string(),
+    greeting: z.string(),
+    speechStyle: z.string(),
+    quirk: z.string(),
+  }),
   maxConcurrency: z.number().int().positive().default(1),
 });
 export type AgentSpec = z.infer<typeof AgentSpecSchema>;
+
+export type AgentPersonality = {
+  archetype: string;
+  traits: string[];
+  voice: string;
+  greeting: string;
+  speechStyle: string;
+  quirk: string;
+};
 
 export type AgentRecord = {
   id: string;
@@ -59,6 +76,7 @@ export type AgentRecord = {
   guardrails: Guardrail[];
   capabilities: string[];
   systemPrompt: string;
+  personality: AgentPersonality;
   playbook: string[];
   stats: {
     completed: number;

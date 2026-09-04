@@ -3,6 +3,7 @@ import { getDb } from "./db";
 import type {
   AgentRecord,
   AgentStatus,
+  AgentPersonality,
   ChatMessage,
   Guardrail,
   Handoff,
@@ -11,6 +12,7 @@ import type {
   SuiteEvent,
   Task,
 } from "./types";
+import { personalityForBuiltin } from "./personality";
 
 function now() {
   return new Date().toISOString();
@@ -70,6 +72,18 @@ export function listEvents(limit = 80): SuiteEvent[] {
 }
 
 function rowToAgent(r: Record<string, unknown>): AgentRecord {
+  let personality: AgentPersonality;
+  try {
+    const parsed = JSON.parse((r.personality_json as string) || "{}");
+    if (parsed && parsed.archetype) {
+      personality = parsed as AgentPersonality;
+    } else {
+      personality = personalityForBuiltin(r.name as string);
+    }
+  } catch {
+    personality = personalityForBuiltin(r.name as string);
+  }
+
   return {
     id: r.id as string,
     type: r.type as string,
@@ -80,6 +94,7 @@ function rowToAgent(r: Record<string, unknown>): AgentRecord {
     guardrails: JSON.parse(r.guardrails_json as string) as Guardrail[],
     capabilities: JSON.parse(r.capabilities_json as string),
     systemPrompt: r.system_prompt as string,
+    personality,
     playbook: JSON.parse((r.playbook_json as string) || "[]"),
     stats: JSON.parse(r.stats_json as string),
     createdAt: r.created_at as string,
@@ -126,6 +141,7 @@ export function createAgent(input: {
   guardrails: Guardrail[];
   capabilities: string[];
   systemPrompt: string;
+  personality: AgentPersonality;
   status?: AgentStatus;
 }): AgentRecord {
   const ts = now();
@@ -139,6 +155,7 @@ export function createAgent(input: {
     guardrails: input.guardrails,
     capabilities: input.capabilities,
     systemPrompt: input.systemPrompt,
+    personality: input.personality,
     playbook: [],
     stats: { completed: 0, failed: 0, lessons: 0 },
     createdAt: ts,
@@ -150,8 +167,8 @@ export function createAgent(input: {
     .prepare(
       `INSERT INTO agents (
         id, type, name, job_profile, status, rules_json, guardrails_json, capabilities_json,
-        system_prompt, playbook_json, stats_json, created_at, last_seen_at, last_heartbeat_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        system_prompt, personality_json, playbook_json, stats_json, created_at, last_seen_at, last_heartbeat_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       agent.id,
@@ -163,6 +180,7 @@ export function createAgent(input: {
       JSON.stringify(agent.guardrails),
       JSON.stringify(agent.capabilities),
       agent.systemPrompt,
+      JSON.stringify(agent.personality),
       JSON.stringify(agent.playbook),
       JSON.stringify(agent.stats),
       agent.createdAt,
@@ -170,24 +188,58 @@ export function createAgent(input: {
       agent.lastHeartbeatAt,
     );
 
-  emitEvent("success", "registry", `Agent online: ${agent.name} · ${agent.jobProfile}`, {
-    agentId: agent.id,
-    type: agent.type,
-  });
+  emitEvent(
+    "success",
+    "registry",
+    `Agent online: ${agent.name} · ${agent.jobProfile} · ${agent.personality.archetype}`,
+    {
+      agentId: agent.id,
+      type: agent.type,
+      personality: agent.personality.archetype,
+    },
+  );
 
   return agent;
 }
 
 export function updateAgentIdentity(
   id: string,
-  input: { name: string; jobProfile: string; systemPrompt?: string },
+  input: {
+    name: string;
+    jobProfile: string;
+    systemPrompt?: string;
+    personality?: AgentPersonality;
+  },
 ) {
-  if (input.systemPrompt) {
+  if (input.personality && input.systemPrompt) {
+    getDb()
+      .prepare(
+        `UPDATE agents SET name = ?, job_profile = ?, system_prompt = ?, personality_json = ? WHERE id = ?`,
+      )
+      .run(
+        input.name,
+        input.jobProfile,
+        input.systemPrompt,
+        JSON.stringify(input.personality),
+        id,
+      );
+  } else if (input.systemPrompt) {
     getDb()
       .prepare(
         `UPDATE agents SET name = ?, job_profile = ?, system_prompt = ? WHERE id = ?`,
       )
       .run(input.name, input.jobProfile, input.systemPrompt, id);
+  } else if (input.personality) {
+    getDb()
+      .prepare(
+        `UPDATE agents SET name = ?, job_profile = ?, personality_json = ? WHERE id = ?`,
+      )
+      .run(
+        input.name,
+        input.jobProfile,
+        JSON.stringify(input.personality),
+        id,
+      );
   } else {
     getDb()
       .prepare(`UPDATE agents SET name = ?, job_profile = ? WHERE id = ?`)

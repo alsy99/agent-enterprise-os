@@ -23,7 +23,11 @@ import {
   allocateUniqueName,
   BUILTIN_SPECS,
   inventSpecForCapability,
+  listTakenArchetypes,
 } from "./templates";
+import {
+  inventPersonality,
+} from "./personality";
 import {
   defaultPipelineSkills,
   listSkillMetadata,
@@ -78,48 +82,79 @@ export function ensureBuiltinAgents() {
         guardrails: spec.guardrails,
         capabilities: spec.capabilities,
         systemPrompt: spec.systemPrompt,
+        personality: spec.personality,
         status: "online",
       });
       continue;
     }
 
+    const needsPersonality =
+      !match.personality?.archetype || match.personality.archetype === "";
     if (
       match.name !== spec.name ||
       match.jobProfile !== spec.jobProfile ||
-      !match.jobProfile
+      !match.jobProfile ||
+      needsPersonality
     ) {
       updateAgentIdentity(match.id, {
         name: spec.name,
         jobProfile: spec.jobProfile,
         systemPrompt: spec.systemPrompt,
+        personality: spec.personality,
       });
     }
   }
 
-  // Rename legacy generic specialists to unique names + job profiles
   for (const agent of listAgents()) {
     if (!agent.type.startsWith("specialist_")) continue;
     const capability = agent.type.replace("specialist_", "");
-    const looksGeneric =
+    const preferredByCap: Record<string, string> = {
+      security: "Night-watch sentinel",
+      docs: "Story-minded scribe",
+      design: "Sparky tinkerer",
+      data: "Stoic operator",
+      testing: "Exacting editor",
+      ops: "Stoic operator",
+      support: "Warm diplomat",
+    };
+    const preferred = preferredByCap[capability];
+    const needsPersonality =
+      !agent.personality?.archetype ||
+      (preferred && agent.personality.archetype !== preferred) ||
+      (agent.personality.archetype === "Calm strategist" &&
+        agent.name !== "Nova");
+    const looksGenericName =
       agent.name.toLowerCase().includes("specialist") ||
       !agent.jobProfile ||
       agent.name === agent.jobProfile;
-    if (!looksGeneric) continue;
+    if (!needsPersonality && !looksGenericName) continue;
 
-    const name = allocateUniqueName(takenNames([agent.name]), capability);
-    const title =
-      inventSpecForCapability(capability, takenNames()).jobProfile;
+    const taken = takenNames([agent.name]);
+    const name = looksGenericName
+      ? allocateUniqueName(taken, capability)
+      : agent.name;
+    const takenArch = listTakenArchetypes(
+      listAgents().map((a) => a.personality),
+    );
+    const personality = needsPersonality
+      ? inventPersonality(name, capability, takenArch)
+      : agent.personality;
+    const title = looksGenericName
+      ? inventSpecForCapability(capability, taken, takenArch).jobProfile
+      : agent.jobProfile;
     updateAgentIdentity(agent.id, {
       name,
       jobProfile: title,
-      systemPrompt: `You are ${name}, ${title}. Follow your rules, honor guardrails, learn from outcomes, and leave clean handoff context.`,
+      personality,
+      systemPrompt: `You are ${name}, ${title} — a ${personality.archetype}. Voice: ${personality.voice} Style: ${personality.speechStyle} Quirk: ${personality.quirk}. Follow your rules, honor guardrails, learn from outcomes, and leave clean handoff context.`,
     });
   }
 }
 
 export function spawnAgentForCapability(capability: string): AgentRecord {
   const taken = takenNames();
-  const spec = inventSpecForCapability(capability, taken);
+  const takenArch = listTakenArchetypes(listAgents().map((a) => a.personality));
+  const spec = inventSpecForCapability(capability, taken, takenArch);
   const sameType = countAgentsOfType(spec.type);
   const busySame = listAgents().filter(
     (a) => a.type === spec.type && a.status === "busy",
@@ -134,8 +169,8 @@ export function spawnAgentForCapability(capability: string): AgentRecord {
     if (waiting) {
       emitEvent(
         "warn",
-        "orchestrator",
-        `Spawn blocked by guardrail; reusing ${waiting.name}`,
+        "Nova",
+        `Spawn blocked by guardrail; reusing ${waiting.name} (${waiting.personality.archetype})`,
         { capability },
       );
       return waiting;
@@ -147,6 +182,11 @@ export function spawnAgentForCapability(capability: string): AgentRecord {
       ? spec.name
       : allocateUniqueName(taken, `${capability}${sameType + 1}`);
 
+  const personality =
+    sameType === 0
+      ? spec.personality
+      : inventPersonality(name, capability, takenArch);
+
   const agent = createAgent({
     type: spec.type,
     name,
@@ -154,15 +194,18 @@ export function spawnAgentForCapability(capability: string): AgentRecord {
     rules: spec.rules,
     guardrails: spec.guardrails,
     capabilities: spec.capabilities,
-    systemPrompt: spec.systemPrompt.replace(spec.name, name),
+    systemPrompt: spec.systemPrompt
+      .replace(spec.name, name)
+      .replace(spec.personality.archetype, personality.archetype),
+    personality,
     status: "online",
   });
 
   emitEvent(
     "success",
-    "orchestrator",
-    `Spawned ${agent.name} (${agent.jobProfile}) for "${capability}"`,
-    { agentId: agent.id, capability },
+    "Nova",
+    `Hatched ${agent.name} — ${agent.jobProfile}, ${agent.personality.archetype}. ${agent.personality.greeting}`,
+    { agentId: agent.id, capability, personality: agent.personality },
   );
 
   return agent;
@@ -362,12 +405,13 @@ function buildAgentIntroduction(): string {
   ];
   for (const agent of agents) {
     lines.push(`## ${agent.name} — ${agent.jobProfile}`);
+    lines.push(`Character: ${agent.personality.archetype}`);
+    lines.push(`Traits: ${agent.personality.traits.join(", ")}`);
+    lines.push(`Voice: ${agent.personality.voice}`);
+    lines.push(`Quirk: ${agent.personality.quirk}`);
     lines.push(`Status: ${agent.status}`);
     lines.push(`Focus: ${agent.capabilities.join(", ")}`);
-    lines.push(`Rules: ${agent.rules.slice(0, 2).join(" · ")}`);
-    if (agent.playbook[0]) {
-      lines.push(`Recent learning: ${agent.playbook[0]}`);
-    }
+    lines.push(`Greeting: "${agent.personality.greeting}"`);
     lines.push(``);
   }
   lines.push(
@@ -562,6 +606,8 @@ function buildWorkProduct(agent: AgentRecord, task: Task, objective: Objective) 
     `## ${task.title}`,
     ``,
     `Agent: ${agent.name} · ${agent.jobProfile}`,
+    `Character: ${agent.personality.archetype} — ${agent.personality.traits.join(", ")}`,
+    `Voice note: ${agent.personality.speechStyle}`,
     `Skill: ${skill?.name ?? "ad-hoc"}`,
     ``,
     `### Decision`,

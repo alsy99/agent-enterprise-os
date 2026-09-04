@@ -667,6 +667,10 @@ export function SuiteDashboard() {
                         <p className="mt-1 text-base text-lime-300">
                           {agent.jobProfile}
                         </p>
+                        <p className="mt-1 text-sm text-zinc-400">
+                          {agent.personality?.archetype ?? "Suite agent"} ·{" "}
+                          {(agent.personality?.traits ?? []).slice(0, 3).join(", ")}
+                        </p>
                       </div>
                       <Badge
                         variant="outline"
@@ -696,6 +700,20 @@ export function SuiteDashboard() {
                       >
                         Talk with {agent.name}
                       </Button>
+                      <div>
+                        <p className="font-mono text-sm uppercase tracking-wider text-zinc-400">
+                          Character
+                        </p>
+                        <p className="mt-2 text-base text-zinc-300">
+                          {agent.personality?.voice}
+                        </p>
+                        <p className="mt-2 text-sm text-zinc-500">
+                          Quirk: {agent.personality?.quirk}
+                        </p>
+                        <p className="mt-2 text-sm italic text-zinc-400">
+                          “{agent.personality?.greeting}”
+                        </p>
+                      </div>
                       <div>
                         <p className="font-mono text-sm uppercase tracking-wider text-zinc-400">
                           Playbook / learning
@@ -749,6 +767,9 @@ export function SuiteDashboard() {
                 >
                   <p className="font-medium text-white">{agent.name}</p>
                   <p className="text-sm text-lime-300">{agent.jobProfile}</p>
+                  <p className="text-xs text-zinc-500">
+                    {agent.personality?.archetype}
+                  </p>
                 </button>
               ))}
             </aside>
@@ -761,7 +782,8 @@ export function SuiteDashboard() {
                       {talkAgent.name}
                     </h2>
                     <p className="text-base text-zinc-400">
-                      {talkAgent.jobProfile} · ask for status, or{" "}
+                      {talkAgent.jobProfile} ·{" "}
+                      {talkAgent.personality?.archetype} · ask for status, or{" "}
                       <span className="text-zinc-300">assign: your task</span>
                     </p>
                   </div>

@@ -1,4 +1,9 @@
 import type { AgentSpec } from "./types";
+import {
+  inventPersonality,
+  listTakenArchetypes,
+  personalityForBuiltin,
+} from "./personality";
 
 const FIRST_NAMES = [
   "Nova",
@@ -23,8 +28,19 @@ const FIRST_NAMES = [
   "Cleo",
 ];
 
+function withBuiltinPersonality(
+  spec: Omit<AgentSpec, "personality">,
+): AgentSpec {
+  const personality = personalityForBuiltin(spec.name);
+  return {
+    ...spec,
+    personality,
+    systemPrompt: `${spec.systemPrompt} Personality — ${personality.archetype}. Voice: ${personality.voice} Style: ${personality.speechStyle} Quirk: ${personality.quirk}`,
+  };
+}
+
 export const BUILTIN_SPECS: AgentSpec[] = [
-  {
+  withBuiltinPersonality({
     type: "orchestrator",
     name: "Nova",
     jobProfile: "Chief Orchestrator",
@@ -41,6 +57,7 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       "Spawn a specialist when no agent covers a required capability.",
       "Never assign work that violates an agent's guardrails.",
       "Persist every routing decision as an observation.",
+      "When creating agents, give each a unique name, job profile, and personality.",
     ],
     guardrails: [
       {
@@ -55,10 +72,10 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You are Nova, Chief Orchestrator. Use the nova-orchestrate skill and Anthropic orchestrator-workers pattern: keep plans simple, show your routing decisions, load worker skills only when triggered, and prefer existing agents over spawning.",
+      "You are Nova, Chief Orchestrator. Use the nova-orchestrate skill and Anthropic orchestrator-workers pattern: keep plans simple, show your routing decisions, load worker skills only when triggered, and prefer existing agents over spawning. When you hatch a new specialist, invent a distinct character (archetype, voice, quirk) — never clone an existing personality.",
     maxConcurrency: 1,
-  },
-  {
+  }),
+  withBuiltinPersonality({
     type: "researcher",
     name: "Kai",
     jobProfile: "Research Analyst",
@@ -80,8 +97,8 @@ export const BUILTIN_SPECS: AgentSpec[] = [
     systemPrompt:
       "You are Kai, Research Analyst. When triggered, follow the research skill: structure problems, mark unknowns, and hand off actionable next steps.",
     maxConcurrency: 2,
-  },
-  {
+  }),
+  withBuiltinPersonality({
     type: "builder",
     name: "Remy",
     jobProfile: "Implementation Engineer",
@@ -103,8 +120,8 @@ export const BUILTIN_SPECS: AgentSpec[] = [
     systemPrompt:
       "You are Remy, Implementation Engineer. When triggered, follow the implement skill: ship the smallest complete slice and leave a clean handoff.",
     maxConcurrency: 2,
-  },
-  {
+  }),
+  withBuiltinPersonality({
     type: "reviewer",
     name: "Sable",
     jobProfile: "Quality Reviewer",
@@ -126,8 +143,8 @@ export const BUILTIN_SPECS: AgentSpec[] = [
     systemPrompt:
       "You are Sable, Quality Reviewer. When triggered, follow the review skill (evaluator-optimizer): validate against criteria and request rework instead of rubber-stamping.",
     maxConcurrency: 2,
-  },
-  {
+  }),
+  withBuiltinPersonality({
     type: "learner",
     name: "Iori",
     jobProfile: "Learning Strategist",
@@ -149,7 +166,7 @@ export const BUILTIN_SPECS: AgentSpec[] = [
     systemPrompt:
       "You are Iori, Learning Strategist. When triggered, follow the learn skill: consolidate memories into short playbook updates.",
     maxConcurrency: 1,
-  },
+  }),
 ];
 
 const JOB_TITLES_BY_CAP: Record<string, string> = {
@@ -204,6 +221,7 @@ export function allocateUniqueName(taken: Set<string>, seed: string): string {
 export function inventSpecForCapability(
   capability: string,
   takenNames: Set<string> = new Set(),
+  takenArchetypes: Set<string> = new Set(),
 ): AgentSpec {
   const type = capabilityToPreferredType(capability);
   const existing = BUILTIN_SPECS.find((s) => s.type === type);
@@ -217,6 +235,7 @@ export function inventSpecForCapability(
       .join(" ")} Specialist`;
 
   const name = allocateUniqueName(takenNames, capability);
+  const personality = inventPersonality(name, capability, takenArchetypes);
 
   return {
     type,
@@ -229,6 +248,7 @@ export function inventSpecForCapability(
       "Respect suite-wide handoff protocol.",
       "Persist lessons after each completed task.",
       "Stay online and wait for the next assignment.",
+      `Stay in character as a ${personality.archetype}.`,
     ],
     guardrails: [
       {
@@ -242,7 +262,10 @@ export function inventSpecForCapability(
         severity: "block",
       },
     ],
-    systemPrompt: `You are ${name}, ${title}. Follow your rules, honor guardrails, learn from outcomes, and leave clean handoff context.`,
+    personality,
+    systemPrompt: `You are ${name}, ${title} — a ${personality.archetype}. Voice: ${personality.voice} Style: ${personality.speechStyle} Quirk: ${personality.quirk}. Follow your rules, honor guardrails, learn from outcomes, and leave clean handoff context.`,
     maxConcurrency: 1,
   };
 }
+
+export { listTakenArchetypes };

@@ -45,3 +45,13 @@ workers execute; results are handed off with explicit context.
 - Higher-priority objectives schedule first.
 - Never assign work that violates a worker’s guardrails.
 - Prefer existing online agents over duplicates.
+
+## Hatching new agents
+
+When a capability gap requires a new specialist:
+
+1. Pick a **unique name** not already on the roster.
+2. Assign a **job profile** for that capability.
+3. Invent a **distinct personality**: archetype, traits, voice, speech style, quirk, greeting.
+4. Avoid cloning an archetype already used by an online teammate when alternatives exist.
+5. Announce the hatch with name + role + character sketch (not just a type label).

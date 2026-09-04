@@ -19,6 +19,10 @@ import {
 import { executeTask } from "./orchestrator";
 import type { AgentRecord, ChatMessage } from "./types";
 
+function voiceLead(agent: AgentRecord, line: string) {
+  return `${agent.personality.greeting}\n\n${line}`;
+}
+
 function agentTaskSummary(agent: AgentRecord) {
   const mine = listTasksForAgent(agent.id);
   const active = mine.filter((t) =>
@@ -30,7 +34,10 @@ function agentTaskSummary(agent: AgentRecord) {
   );
 
   const lines = [
-    `I'm ${agent.name}, ${agent.jobProfile} (${agent.status}).`,
+    voiceLead(
+      agent,
+      `Status check — I'm ${agent.name}, ${agent.jobProfile}, a ${agent.personality.archetype} (${agent.status}).`,
+    ),
     ``,
     `Active tasks: ${active.length}`,
     ...active.slice(0, 5).map((t) => {
@@ -40,10 +47,12 @@ function agentTaskSummary(agent: AgentRecord) {
     ``,
     `Completed: ${done.length} · Failed/blocked: ${failed.length}`,
     `Lessons logged: ${agent.stats.lessons}`,
+    ``,
+    `(${agent.personality.quirk})`,
   ];
 
   if (active.length === 0 && done.length === 0) {
-    lines.push(``, `No assigned work yet — you can give me a task directly.`);
+    lines.push(``, `No assigned work yet — hand me something with "assign: …".`);
   }
 
   if (agent.playbook[0]) {
@@ -63,7 +72,6 @@ function extractAssignBrief(message: string): string | null {
     const m = message.trim().match(re);
     if (m?.[1]?.trim()) return m[1].trim();
   }
-  // "assign yourself X" / "I need you to X"
   const soft = message.trim().match(
     /(?:assign yourself|i need you to|please)\s+(.+)/i,
   );
@@ -78,12 +86,13 @@ function isStatusAsk(message: string) {
 }
 
 function assignDirectTask(agent: AgentRecord, brief: string) {
-  // Guardrail: capability boundary for specialists
   const primaryCap = agent.capabilities[0] ?? "general";
   const skill = skillForCapability(primaryCap);
   const objective = createObjective({
     title:
-      brief.length > 72 ? `${brief.slice(0, 69).trim()}…` : brief.charAt(0).toUpperCase() + brief.slice(1),
+      brief.length > 72
+        ? `${brief.slice(0, 69).trim()}…`
+        : brief.charAt(0).toUpperCase() + brief.slice(1),
     description: `Direct assignment to ${agent.name}: ${brief}`,
     priority: 3,
   });
@@ -92,7 +101,7 @@ function assignDirectTask(agent: AgentRecord, brief: string) {
     objectiveId: objective.id,
     title: `${agent.name}: ${objective.title}`,
     description: [
-      `Direct user assignment to ${agent.name} (${agent.jobProfile}).`,
+      `Direct user assignment to ${agent.name} (${agent.jobProfile}, ${agent.personality.archetype}).`,
       `Brief: ${brief}`,
       skill ? `Skill: ${skill.name}` : "",
     ]
@@ -109,7 +118,7 @@ function assignDirectTask(agent: AgentRecord, brief: string) {
   addMemory({
     agentId: agent.id,
     kind: "observation",
-    content: `Decision: accepted direct assignment from user — "${brief}"`,
+    content: `Decision: accepted direct assignment from user — "${brief}" (in character as ${agent.personality.archetype})`,
     tags: ["decision", "direct-assign"],
     relatedTaskId: task.id,
     relatedObjectiveId: objective.id,
@@ -122,13 +131,10 @@ function assignDirectTask(agent: AgentRecord, brief: string) {
     agentId: agent.id,
   });
 
-  // Run immediately for responsiveness
   const queued = listTasks(objective.id).find((t) => t.id === task.id);
   if (queued) {
-    // ensure assigned before execute
     updateTask(task.id, { assignedAgentId: agent.id, status: "queued" });
     executeTask({ ...queued, assignedAgentId: agent.id });
-    // If still only one task, mark objective complete when done
     const after = listTasks(objective.id);
     if (after.every((t) => t.status === "completed")) {
       updateObjectiveStatus(objective.id, "completed");
@@ -139,10 +145,10 @@ function assignDirectTask(agent: AgentRecord, brief: string) {
   return { objective, task: finished ?? task };
 }
 
-function craftReply(agent: AgentRecord, message: string): {
-  reply: string;
-  meta?: Record<string, unknown>;
-} {
+function craftReply(
+  agent: AgentRecord,
+  message: string,
+): { reply: string; meta?: Record<string, unknown> } {
   if (isStatusAsk(message)) {
     return {
       reply: agentTaskSummary(agent),
@@ -152,18 +158,6 @@ function craftReply(agent: AgentRecord, message: string): {
 
   const assignBrief = extractAssignBrief(message);
   if (assignBrief) {
-    // Check guardrails for specialists outside their lane — still allow with note if they have "general"
-    const blocked =
-      agent.guardrails.find((g) => g.id === "capability-boundary") &&
-      !agent.capabilities.includes("general") &&
-      assignBrief.length > 0
-        ? null // allow direct assign onto their primary capability
-        : null;
-
-    if (blocked) {
-      return { reply: blocked, meta: { intent: "assign-blocked" } };
-    }
-
     const { objective, task } = assignDirectTask(agent, assignBrief);
     const resultPreview = task.result
       ? `\n\n### Output\n${task.result.slice(0, 1200)}`
@@ -171,11 +165,16 @@ function craftReply(agent: AgentRecord, message: string): {
 
     return {
       reply: [
-        `Got it — I'll take this on as ${agent.jobProfile}.`,
+        voiceLead(
+          agent,
+          `On it — ${agent.personality.speechStyle}`,
+        ),
         ``,
         `Assigned: ${task.title}`,
         `Status: ${task.status}`,
         resultPreview,
+        ``,
+        `(${agent.personality.quirk})`,
       ].join("\n"),
       meta: {
         intent: "assign",
@@ -186,27 +185,26 @@ function craftReply(agent: AgentRecord, message: string): {
     };
   }
 
-  // Default conversational reply grounded in role + open work
   const active = listTasksForAgent(agent.id).filter((t) =>
     ["queued", "assigned", "running"].includes(t.status),
   );
   const skill = skillForCapability(agent.capabilities[0] ?? "");
-  const skillHint = skill ? loadSkill(skill.id)?.instructions.split("\n")[0] : "";
 
   return {
     reply: [
-      `${agent.name} here (${agent.jobProfile}).`,
-      ``,
-      `You said: "${message}"`,
+      voiceLead(
+        agent,
+        `Noted — "${message}". ${agent.personality.voice}`,
+      ),
       ``,
       active.length
         ? `I'm currently on: ${active.map((t) => t.title).join("; ")}.`
         : `I'm waiting for work.`,
       ``,
-      `You can:`,
-      `- ask for a status update`,
-      `- assign me directly: "assign: <task>" or "do: <task>"`,
-      skillHint ? `- my skill focus: ${skill?.name}` : "",
+      `You can ask for a status update, or assign me with "assign: <task>".`,
+      skill ? `Skill focus: ${skill.name}.` : "",
+      ``,
+      `(${agent.personality.quirk})`,
     ]
       .filter(Boolean)
       .join("\n"),
@@ -240,14 +238,13 @@ export function chatWithAgent(
     meta,
   });
 
-  // Light learning from direct chats
   if (meta?.intent === "assign") {
-    const lesson = `${agent.name} accepted a direct user assignment and produced a result under their ${agent.jobProfile} lane.`;
+    const lesson = `${agent.name} (${agent.personality.archetype}) accepted a direct user assignment in-character and delivered a result.`;
     addMemory({
       agentId,
       kind: "lesson",
       content: lesson,
-      tags: ["chat", "direct-assign"],
+      tags: ["chat", "direct-assign", agent.personality.archetype],
       importance: 0.55,
     });
     bumpAgentStats(agentId, "lessons");

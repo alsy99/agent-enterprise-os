@@ -134,6 +134,11 @@ function migrate(database: Database.Database) {
       `ALTER TABLE agents ADD COLUMN job_profile TEXT NOT NULL DEFAULT ''`,
     );
   }
+  if (!columns.some((c) => c.name === "personality_json")) {
+    database.exec(
+      `ALTER TABLE agents ADD COLUMN personality_json TEXT NOT NULL DEFAULT '{}'`,
+    );
+  }
 }
 
 export function resetDbConnection() {
