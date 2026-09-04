@@ -10,6 +10,7 @@ import {
   listMemories,
   listObjectives,
   listTasks,
+  updateAgentIdentity,
   updateAgentPlaybook,
   updateAgentStatus,
   updateObjectiveStatus,
@@ -17,7 +18,11 @@ import {
   acceptHandoff,
   addMemory,
 } from "./store";
-import { BUILTIN_SPECS, inventSpecForCapability } from "./templates";
+import {
+  allocateUniqueName,
+  BUILTIN_SPECS,
+  inventSpecForCapability,
+} from "./templates";
 import type { AgentRecord, Objective, Task } from "./types";
 
 function agentCovers(agent: AgentRecord, capability: string) {
@@ -31,9 +36,11 @@ function findAvailableAgent(capability: string): AgentRecord | null {
       (a.status === "online" || a.status === "waiting"),
   );
   if (agents.length === 0) return null;
-  // Prefer least busy historically
   return agents.sort(
-    (a, b) => a.stats.completed + a.stats.failed - (b.stats.completed + b.stats.failed),
+    (a, b) =>
+      a.stats.completed +
+      a.stats.failed -
+      (b.stats.completed + b.stats.failed),
   )[0];
 }
 
@@ -41,24 +48,69 @@ function countAgentsOfType(type: string) {
   return listAgents().filter((a) => a.type === type).length;
 }
 
+function takenNames(extra?: string[]): Set<string> {
+  const set = new Set(
+    listAgents().map((a) => a.name.toLowerCase()),
+  );
+  for (const n of extra ?? []) set.add(n.toLowerCase());
+  return set;
+}
+
 export function ensureBuiltinAgents() {
   const existing = listAgents();
   for (const spec of BUILTIN_SPECS) {
-    if (existing.some((a) => a.type === spec.type)) continue;
-    createAgent({
-      type: spec.type,
-      name: spec.name,
-      rules: spec.rules,
-      guardrails: spec.guardrails,
-      capabilities: spec.capabilities,
-      systemPrompt: spec.systemPrompt,
-      status: "online",
+    const match = existing.find((a) => a.type === spec.type);
+    if (!match) {
+      createAgent({
+        type: spec.type,
+        name: spec.name,
+        jobProfile: spec.jobProfile,
+        rules: spec.rules,
+        guardrails: spec.guardrails,
+        capabilities: spec.capabilities,
+        systemPrompt: spec.systemPrompt,
+        status: "online",
+      });
+      continue;
+    }
+
+    if (
+      match.name !== spec.name ||
+      match.jobProfile !== spec.jobProfile ||
+      !match.jobProfile
+    ) {
+      updateAgentIdentity(match.id, {
+        name: spec.name,
+        jobProfile: spec.jobProfile,
+        systemPrompt: spec.systemPrompt,
+      });
+    }
+  }
+
+  // Rename legacy generic specialists to unique names + job profiles
+  for (const agent of listAgents()) {
+    if (!agent.type.startsWith("specialist_")) continue;
+    const capability = agent.type.replace("specialist_", "");
+    const looksGeneric =
+      agent.name.toLowerCase().includes("specialist") ||
+      !agent.jobProfile ||
+      agent.name === agent.jobProfile;
+    if (!looksGeneric) continue;
+
+    const name = allocateUniqueName(takenNames([agent.name]), capability);
+    const title =
+      inventSpecForCapability(capability, takenNames()).jobProfile;
+    updateAgentIdentity(agent.id, {
+      name,
+      jobProfile: title,
+      systemPrompt: `You are ${name}, ${title}. Follow your rules, honor guardrails, learn from outcomes, and leave clean handoff context.`,
     });
   }
 }
 
 export function spawnAgentForCapability(capability: string): AgentRecord {
-  const spec = inventSpecForCapability(capability);
+  const taken = takenNames();
+  const spec = inventSpecForCapability(capability, taken);
   const sameType = countAgentsOfType(spec.type);
   const busySame = listAgents().filter(
     (a) => a.type === spec.type && a.status === "busy",
@@ -81,20 +133,26 @@ export function spawnAgentForCapability(capability: string): AgentRecord {
     }
   }
 
+  const name =
+    sameType === 0
+      ? spec.name
+      : allocateUniqueName(taken, `${capability}${sameType + 1}`);
+
   const agent = createAgent({
     type: spec.type,
-    name: sameType === 0 ? spec.name : `${spec.name} #${sameType + 1}`,
+    name,
+    jobProfile: spec.jobProfile,
     rules: spec.rules,
     guardrails: spec.guardrails,
     capabilities: spec.capabilities,
-    systemPrompt: spec.systemPrompt,
+    systemPrompt: spec.systemPrompt.replace(spec.name, name),
     status: "online",
   });
 
   emitEvent(
     "success",
     "orchestrator",
-    `Spawned new agent for capability "${capability}": ${agent.name}`,
+    `Spawned ${agent.name} (${agent.jobProfile}) for "${capability}"`,
     { agentId: agent.id, capability },
   );
 

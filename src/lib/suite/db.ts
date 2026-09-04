@@ -114,6 +114,15 @@ function migrate(database: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_memories_agent ON memories(agent_id);
     CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at);
   `);
+
+  const columns = database
+    .prepare(`PRAGMA table_info(agents)`)
+    .all() as Array<{ name: string }>;
+  if (!columns.some((c) => c.name === "job_profile")) {
+    database.exec(
+      `ALTER TABLE agents ADD COLUMN job_profile TEXT NOT NULL DEFAULT ''`,
+    );
+  }
 }
 
 export function resetDbConnection() {

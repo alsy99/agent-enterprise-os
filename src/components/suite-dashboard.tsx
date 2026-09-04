@@ -1,19 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import type {
   AgentRecord,
-  Handoff,
-  MemoryEntry,
   Objective,
-  SuiteEvent,
   Task,
   WorkerState,
 } from "@/lib/suite/types";
@@ -24,19 +19,15 @@ type Snapshot = {
   worker: WorkerState;
   objectives: ObjectiveWithTasks[];
   agents: AgentRecord[];
-  handoffs: Handoff[];
-  memories: MemoryEntry[];
-  events: SuiteEvent[];
 };
 
 const empty: Snapshot = {
   worker: { running: false, ticks: 0, mode: "embedded" },
   objectives: [],
   agents: [],
-  handoffs: [],
-  memories: [],
-  events: [],
 };
+
+type View = "board" | "agents";
 
 function statusTone(status: string) {
   switch (status) {
@@ -46,13 +37,12 @@ function statusTone(status: string) {
     case "busy":
     case "running":
     case "assigned":
+    case "queued":
       return "bg-amber-400/15 text-amber-200 border-amber-400/30";
     case "completed":
-    case "success":
       return "bg-emerald-400/15 text-emerald-300 border-emerald-400/30";
     case "failed":
     case "blocked":
-    case "error":
       return "bg-rose-400/15 text-rose-300 border-rose-400/30";
     case "active":
       return "bg-sky-400/15 text-sky-300 border-sky-400/30";
@@ -61,34 +51,43 @@ function statusTone(status: string) {
   }
 }
 
+function objectiveProgress(tasks: Task[]) {
+  if (tasks.length === 0) return 0;
+  const done = tasks.filter((t) => t.status === "completed").length;
+  return Math.round((done / tasks.length) * 100);
+}
+
+function currentTask(tasks: Task[]) {
+  return (
+    tasks.find((t) => t.status === "running") ??
+    tasks.find((t) => t.status === "queued" || t.status === "assigned") ??
+    null
+  );
+}
+
 export function SuiteDashboard() {
   const [data, setData] = useState<Snapshot>(empty);
+  const [view, setView] = useState<View>("board");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState("5");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [showDispatch, setShowDispatch] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
-      const [workerRes, objRes, agentRes, suiteRes] = await Promise.all([
+      const [workerRes, objRes, agentRes] = await Promise.all([
         fetch("/api/worker", { cache: "no-store" }),
         fetch("/api/objectives", { cache: "no-store" }),
-        fetch("/api/agents?memory=1", { cache: "no-store" }),
-        fetch("/api/suite", { cache: "no-store" }),
+        fetch("/api/agents", { cache: "no-store" }),
       ]);
       const workerJson = await workerRes.json();
       const objJson = await objRes.json();
       const agentJson = await agentRes.json();
-      const suiteJson = await suiteRes.json();
       setData({
         worker: workerJson.worker,
         objectives: objJson.objectives ?? [],
         agents: agentJson.agents ?? [],
-        handoffs: suiteJson.handoffs ?? [],
-        memories: suiteJson.memories ?? [],
-        events: suiteJson.events ?? [],
       });
       setError(null);
     } catch (e) {
@@ -102,10 +101,22 @@ export function SuiteDashboard() {
     return () => clearInterval(id);
   }, [refresh]);
 
-  const selectedAgent = useMemo(
-    () => data.agents.find((a) => a.id === selectedAgentId) ?? data.agents[0],
-    [data.agents, selectedAgentId],
+  const agentById = useMemo(() => {
+    const map = new Map<string, AgentRecord>();
+    for (const a of data.agents) map.set(a.id, a);
+    return map;
+  }, [data.agents]);
+
+  const ongoing = useMemo(
+    () => data.objectives.filter((o) => o.status === "active"),
+    [data.objectives],
   );
+
+  const liveCount = data.agents.filter((a) =>
+    ["online", "waiting", "busy", "learning"].includes(a.status),
+  ).length;
+
+  const busyAgents = data.agents.filter((a) => a.status === "busy").length;
 
   async function submitObjective(e: React.FormEvent) {
     e.preventDefault();
@@ -114,11 +125,7 @@ export function SuiteDashboard() {
       const res = await fetch("/api/objectives", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          description,
-          priority: Number(priority) || 5,
-        }),
+        body: JSON.stringify({ title, description, priority: 5 }),
       });
       if (!res.ok) {
         const body = await res.json();
@@ -126,6 +133,8 @@ export function SuiteDashboard() {
       }
       setTitle("");
       setDescription("");
+      setShowDispatch(false);
+      setView("board");
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Submit failed");
@@ -134,7 +143,7 @@ export function SuiteDashboard() {
     }
   }
 
-  async function workerAction(action: "start" | "stop" | "tick") {
+  async function workerAction(action: "start" | "stop") {
     setBusy(true);
     try {
       await fetch("/api/worker", {
@@ -148,29 +157,19 @@ export function SuiteDashboard() {
     }
   }
 
-  const onlineCount = data.agents.filter((a) =>
-    ["online", "waiting", "busy", "learning"].includes(a.status),
-  ).length;
-
   return (
     <div className="relative min-h-screen overflow-hidden text-zinc-100">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(163,230,53,0.12),_transparent_55%),radial-gradient(ellipse_at_bottom_right,_rgba(14,165,233,0.1),_transparent_45%),linear-gradient(160deg,#09090b_0%,#111827_45%,#0a0f0a_100%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:linear-gradient(rgba(255,255,255,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.06)_1px,transparent_1px)] [background-size:48px_48px]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(163,230,53,0.1),_transparent_50%),linear-gradient(165deg,#09090b,#111827_50%,#0a0f0a)]" />
 
-      <main className="relative mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-        <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            <p className="font-mono text-xs uppercase tracking-[0.35em] text-lime-300/80">
+      <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-lime-300/80">
               Forever Online
             </p>
-            <h1 className="font-[family-name:var(--font-display)] text-4xl leading-none tracking-tight text-white sm:text-5xl">
+            <h1 className="font-[family-name:var(--font-display)] text-3xl tracking-tight text-white sm:text-4xl">
               Agent Suite
             </h1>
-            <p className="max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
-              Self-learning agents stay awake, wait their turn, and persist
-              context for handoffs. The orchestrator spawns specialists when a
-              capability does not exist yet.
-            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -178,31 +177,29 @@ export function SuiteDashboard() {
               variant="outline"
               className={statusTone(data.worker.running ? "waiting" : "failed")}
             >
-              worker {data.worker.running ? "awake" : "stopped"}
+              {data.worker.running ? "awake" : "paused"}
             </Badge>
-            <Badge variant="outline" className={statusTone("online")}>
-              {onlineCount}/{data.agents.length} agents live
-            </Badge>
-            <Badge variant="outline" className="border-white/10 bg-white/5 font-mono text-zinc-300">
-              ticks {data.worker.ticks}
-            </Badge>
+            <span className="font-mono text-xs text-zinc-500">
+              {liveCount} agents · {busyAgents} working · {ongoing.length}{" "}
+              active
+            </span>
             <Button
               size="sm"
               variant="outline"
               disabled={busy}
-              onClick={() => workerAction(data.worker.running ? "stop" : "start")}
-              className="border-lime-400/30 bg-lime-400/10 text-lime-200 hover:bg-lime-400/20"
+              onClick={() =>
+                workerAction(data.worker.running ? "stop" : "start")
+              }
+              className="border-white/15 bg-white/5"
             >
-              {data.worker.running ? "Pause worker" : "Wake worker"}
+              {data.worker.running ? "Pause" : "Wake"}
             </Button>
             <Button
               size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() => workerAction("tick")}
-              className="border-white/15 bg-white/5"
+              onClick={() => setShowDispatch((v) => !v)}
+              className="bg-lime-400 text-zinc-950 hover:bg-lime-300"
             >
-              Force tick
+              {showDispatch ? "Close" : "New objective"}
             </Button>
           </div>
         </header>
@@ -213,332 +210,183 @@ export function SuiteDashboard() {
           </div>
         ) : null}
 
-        <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        {showDispatch ? (
           <form
             onSubmit={submitObjective}
-            className="rounded-2xl border border-white/10 bg-zinc-950/50 p-5 backdrop-blur"
+            className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4"
           >
-            <h2 className="font-[family-name:var(--font-display)] text-xl text-white">
-              Dispatch objective
-            </h2>
-            <p className="mt-1 text-sm text-zinc-400">
-              Tip: add{" "}
-              <code className="rounded bg-white/5 px-1.5 py-0.5 font-mono text-lime-300">
-                [cap:security]
-              </code>{" "}
-              to force the orchestrator to spawn a new specialist type.
-            </p>
-            <div className="mt-4 space-y-3">
+            <div className="space-y-3">
               <Input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Objective title"
                 required
-                className="border-white/10 bg-black/30 text-zinc-100 placeholder:text-zinc-500"
+                className="border-white/10 bg-black/30"
               />
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="What should the suite accomplish?"
+                placeholder="What should the suite accomplish? Optional: [cap:docs]"
                 required
-                rows={4}
-                className="border-white/10 bg-black/30 text-zinc-100 placeholder:text-zinc-500"
+                rows={3}
+                className="border-white/10 bg-black/30"
               />
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Input
-                  type="number"
-                  min={1}
-                  max={10}
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="border-white/10 bg-black/30 sm:w-28"
-                  aria-label="Priority"
-                />
-                <Button
-                  type="submit"
-                  disabled={busy}
-                  className="bg-lime-400 text-zinc-950 hover:bg-lime-300"
-                >
-                  Queue for forever agents
-                </Button>
-              </div>
+              <Button
+                type="submit"
+                disabled={busy}
+                className="bg-lime-400 text-zinc-950 hover:bg-lime-300"
+              >
+                Queue objective
+              </Button>
             </div>
           </form>
+        ) : null}
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/50 p-5 backdrop-blur">
-            <h2 className="font-[family-name:var(--font-display)] text-xl text-white">
-              Live event stream
-            </h2>
-            <ScrollArea className="mt-4 h-64">
-              <div className="space-y-3 pr-3">
-                {data.events.length === 0 ? (
-                  <p className="text-sm text-zinc-500">
-                    Waiting for the first heartbeat…
-                  </p>
-                ) : (
-                  data.events.map((event) => (
-                    <div
-                      key={event.id}
-                      className="rounded-lg border border-white/8 bg-black/20 px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <Badge
-                          variant="outline"
-                          className={statusTone(event.level)}
-                        >
-                          {event.level}
-                        </Badge>
-                        <span className="font-mono text-[11px] text-zinc-500">
-                          {formatDistanceToNow(new Date(event.createdAt), {
-                            addSuffix: true,
-                          })}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs font-medium text-zinc-300">
-                        {event.source}
-                      </p>
-                      <p className="text-sm text-zinc-400">{event.message}</p>
-                    </div>
-                  ))
-                )}
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            variant={view === "board" ? "default" : "outline"}
+            onClick={() => setView("board")}
+            className={
+              view === "board"
+                ? "bg-white text-zinc-950"
+                : "border-white/15 bg-transparent"
+            }
+          >
+            Ongoing
+          </Button>
+          <Button
+            size="sm"
+            variant={view === "agents" ? "default" : "outline"}
+            onClick={() => setView("agents")}
+            className={
+              view === "agents"
+                ? "bg-white text-zinc-950"
+                : "border-white/15 bg-transparent"
+            }
+          >
+            Agents
+          </Button>
+        </div>
+
+        {view === "board" ? (
+          <section className="space-y-3">
+            {ongoing.length === 0 ? (
+              <div className="rounded-2xl border border-dashed border-white/15 bg-zinc-950/40 px-5 py-12 text-center">
+                <p className="text-zinc-300">No ongoing work</p>
+                <p className="mt-1 text-sm text-zinc-500">
+                  Queue an objective to put the suite to work.
+                </p>
               </div>
-            </ScrollArea>
-          </div>
-        </section>
+            ) : (
+              ongoing.map((objective) => {
+                const progress = objectiveProgress(objective.tasks);
+                const active = currentTask(objective.tasks);
+                const assignee = active?.assignedAgentId
+                  ? agentById.get(active.assignedAgentId)
+                  : null;
+                const completed = objective.tasks.filter(
+                  (t) => t.status === "completed",
+                ).length;
 
-        <section className="grid gap-6 xl:grid-cols-[1fr_1fr]">
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/50 p-5 backdrop-blur">
-            <div className="flex items-center justify-between">
-              <h2 className="font-[family-name:var(--font-display)] text-xl text-white">
-                Agents
-              </h2>
-              <span className="font-mono text-xs text-zinc-500">
-                always waiting their turn
-              </span>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {data.agents.map((agent) => (
-                <button
-                  key={agent.id}
-                  type="button"
-                  onClick={() => setSelectedAgentId(agent.id)}
-                  className={`rounded-xl border p-3 text-left transition ${
-                    selectedAgent?.id === agent.id
-                      ? "border-lime-400/40 bg-lime-400/10"
-                      : "border-white/10 bg-black/20 hover:border-white/20"
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-medium text-zinc-100">{agent.name}</p>
-                    <Badge variant="outline" className={statusTone(agent.status)}>
-                      {agent.status}
-                    </Badge>
-                  </div>
-                  <p className="mt-1 font-mono text-[11px] text-zinc-500">
-                    {agent.type}
-                  </p>
-                  <p className="mt-2 line-clamp-2 text-xs text-zinc-400">
-                    {agent.capabilities.join(" · ")}
-                  </p>
-                  <p className="mt-2 font-mono text-[11px] text-zinc-500">
-                    done {agent.stats.completed} · fail {agent.stats.failed} ·
-                    lessons {agent.stats.lessons}
-                  </p>
-                </button>
-              ))}
-            </div>
-
-            {selectedAgent ? (
-              <div className="mt-5 rounded-xl border border-white/10 bg-black/25 p-4">
-                <h3 className="text-sm font-medium text-lime-300">
-                  {selectedAgent.name} rules & learning
-                </h3>
-                <div className="mt-3 grid gap-4 md:grid-cols-2">
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
-                      Rules
-                    </p>
-                    <ul className="mt-2 space-y-1 text-xs text-zinc-300">
-                      {selectedAgent.rules.map((rule) => (
-                        <li key={rule}>• {rule}</li>
-                      ))}
-                    </ul>
-                    <p className="mt-3 font-mono text-[11px] uppercase tracking-wider text-zinc-500">
-                      Guardrails
-                    </p>
-                    <ul className="mt-2 space-y-1 text-xs text-zinc-300">
-                      {selectedAgent.guardrails.map((g) => (
-                        <li key={g.id}>
-                          • [{g.severity}] {g.rule}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
-                      Playbook
-                    </p>
-                    <ul className="mt-2 space-y-1 text-xs text-zinc-300">
-                      {selectedAgent.playbook.length === 0 ? (
-                        <li className="text-zinc-500">No lessons yet</li>
-                      ) : (
-                        selectedAgent.playbook.slice(0, 8).map((p) => (
-                          <li key={p}>• {p}</li>
-                        ))
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/50 p-5 backdrop-blur">
-            <h2 className="font-[family-name:var(--font-display)] text-xl text-white">
-              Objectives & tasks
-            </h2>
-            <ScrollArea className="mt-4 h-[34rem]">
-              <div className="space-y-4 pr-3">
-                {data.objectives.length === 0 ? (
-                  <p className="text-sm text-zinc-500">
-                    No objectives yet. Dispatch one to wake the pipeline.
-                  </p>
-                ) : (
-                  data.objectives.map((objective) => (
-                    <div
-                      key={objective.id}
-                      className="rounded-xl border border-white/10 bg-black/20 p-4"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <h3 className="font-medium text-zinc-100">
+                return (
+                  <article
+                    key={objective.id}
+                    className="rounded-2xl border border-white/10 bg-zinc-950/55 p-5"
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-medium text-white">
                           {objective.title}
-                        </h3>
-                        <div className="flex items-center gap-2">
-                          <Badge
-                            variant="outline"
-                            className={statusTone(objective.status)}
-                          >
-                            {objective.status}
-                          </Badge>
-                          <span className="font-mono text-[11px] text-zinc-500">
-                            P{objective.priority}
-                          </span>
-                        </div>
+                        </h2>
+                        <p className="mt-1 line-clamp-2 text-sm text-zinc-400">
+                          {objective.description.replace(/\s*\[cap:[^\]]+\]/gi, "")}
+                        </p>
                       </div>
-                      <p className="mt-1 text-sm text-zinc-400">
-                        {objective.description}
-                      </p>
-                      <Separator className="my-3 bg-white/10" />
-                      <div className="space-y-2">
-                        {objective.tasks.map((task) => (
-                          <div
-                            key={task.id}
-                            className="rounded-lg border border-white/8 bg-zinc-950/50 px-3 py-2"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <p className="text-sm text-zinc-200">{task.title}</p>
-                              <Badge
-                                variant="outline"
-                                className={statusTone(task.status)}
-                              >
-                                {task.status}
-                              </Badge>
-                            </div>
-                            <p className="mt-1 font-mono text-[11px] text-zinc-500">
-                              needs:{task.requiredCapability}
-                              {task.assignedAgentId
-                                ? ` · agent:${task.assignedAgentId.slice(0, 8)}`
-                                : ""}
-                            </p>
-                            {task.result ? (
-                              <pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 font-mono text-[11px] text-zinc-400">
-                                {task.result}
-                              </pre>
-                            ) : null}
-                            {task.error ? (
-                              <p className="mt-2 text-xs text-rose-300">
-                                {task.error}
-                              </p>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
+                      <Badge
+                        variant="outline"
+                        className={statusTone(objective.status)}
+                      >
+                        {progress}%
+                      </Badge>
                     </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-        </section>
 
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/50 p-5 backdrop-blur">
-            <h2 className="font-[family-name:var(--font-display)] text-xl text-white">
-              Handoffs
-            </h2>
-            <ScrollArea className="mt-4 h-64">
-              <div className="space-y-3 pr-3">
-                {data.handoffs.length === 0 ? (
-                  <p className="text-sm text-zinc-500">No handoffs yet.</p>
-                ) : (
-                  data.handoffs.map((h) => (
-                    <div
-                      key={h.id}
-                      className="rounded-lg border border-white/8 bg-black/20 px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <Badge variant="outline" className={statusTone(h.status)}>
-                          {h.status}
-                        </Badge>
-                        <span className="font-mono text-[11px] text-zinc-500">
-                          {formatDistanceToNow(new Date(h.createdAt), {
-                            addSuffix: true,
-                          })}
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between font-mono text-[11px] text-zinc-500">
+                        <span>
+                          {completed}/{objective.tasks.length} tasks
+                        </span>
+                        <span>
+                          {active
+                            ? active.status === "running"
+                              ? "in progress"
+                              : "up next"
+                            : "wrapping up"}
                         </span>
                       </div>
-                      <p className="mt-1 text-sm text-zinc-300">{h.summary}</p>
+                      <Progress value={progress} className="h-2 bg-white/10" />
                     </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
 
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/50 p-5 backdrop-blur">
-            <h2 className="font-[family-name:var(--font-display)] text-xl text-white">
-              Persistent memory
-            </h2>
-            <ScrollArea className="mt-4 h-64">
-              <div className="space-y-3 pr-3">
-                {data.memories.length === 0 ? (
-                  <p className="text-sm text-zinc-500">Memory bank empty.</p>
-                ) : (
-                  data.memories.map((m) => (
-                    <div
-                      key={m.id}
-                      className="rounded-lg border border-white/8 bg-black/20 px-3 py-2"
-                    >
-                      <div className="flex items-center justify-between gap-2">
+                    {active ? (
+                      <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-3">
+                        <p className="text-sm text-zinc-200">{active.title}</p>
+                        <p className="mt-1 text-xs text-zinc-500">
+                          {assignee
+                            ? `${assignee.name} · ${assignee.jobProfile}`
+                            : `Needs ${active.requiredCapability}`}
+                        </p>
+                      </div>
+                    ) : null}
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {objective.tasks.map((task) => (
                         <Badge
+                          key={task.id}
                           variant="outline"
-                          className="border-sky-400/30 bg-sky-400/10 text-sky-200"
+                          className={statusTone(task.status)}
                         >
-                          {m.kind}
+                          {task.requiredCapability}
                         </Badge>
-                        <span className="font-mono text-[11px] text-zinc-500">
-                          imp {m.importance.toFixed(1)}
-                        </span>
-                      </div>
-                      <p className="mt-1 line-clamp-3 text-sm text-zinc-300">
-                        {m.content}
-                      </p>
+                      ))}
                     </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-        </section>
+                  </article>
+                );
+              })
+            )}
+          </section>
+        ) : (
+          <section className="grid gap-3 sm:grid-cols-2">
+            {data.agents.map((agent) => (
+              <article
+                key={agent.id}
+                className="rounded-2xl border border-white/10 bg-zinc-950/55 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-medium text-white">
+                      {agent.name}
+                    </h2>
+                    <p className="mt-0.5 text-sm text-lime-300/90">
+                      {agent.jobProfile}
+                    </p>
+                  </div>
+                  <Badge
+                    variant="outline"
+                    className={statusTone(agent.status)}
+                  >
+                    {agent.status}
+                  </Badge>
+                </div>
+                <p className="mt-3 text-xs text-zinc-500">
+                  {agent.capabilities.slice(0, 4).join(" · ")}
+                </p>
+                <p className="mt-2 font-mono text-[11px] text-zinc-600">
+                  {agent.stats.completed} done · {agent.stats.lessons} lessons
+                </p>
+              </article>
+            ))}
+          </section>
+        )}
       </main>
     </div>
   );

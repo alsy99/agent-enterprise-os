@@ -39,6 +39,7 @@ export type Guardrail = z.infer<typeof GuardrailSchema>;
 export const AgentSpecSchema = z.object({
   type: z.string(),
   name: z.string(),
+  jobProfile: z.string(),
   description: z.string(),
   capabilities: z.array(z.string()),
   rules: z.array(z.string()),
@@ -52,6 +53,7 @@ export type AgentRecord = {
   id: string;
   type: string;
   name: string;
+  jobProfile: string;
   status: AgentStatus;
   rules: string[];
   guardrails: Guardrail[];

@@ -73,6 +73,7 @@ function rowToAgent(r: Record<string, unknown>): AgentRecord {
     id: r.id as string,
     type: r.type as string,
     name: r.name as string,
+    jobProfile: (r.job_profile as string) || fallbackJobProfile(r.type as string),
     status: r.status as AgentStatus,
     rules: JSON.parse(r.rules_json as string),
     guardrails: JSON.parse(r.guardrails_json as string) as Guardrail[],
@@ -84,6 +85,22 @@ function rowToAgent(r: Record<string, unknown>): AgentRecord {
     lastSeenAt: r.last_seen_at as string,
     lastHeartbeatAt: r.last_heartbeat_at as string,
   };
+}
+
+function fallbackJobProfile(type: string): string {
+  const map: Record<string, string> = {
+    orchestrator: "Chief Orchestrator",
+    researcher: "Research Analyst",
+    builder: "Implementation Engineer",
+    reviewer: "Quality Reviewer",
+    learner: "Learning Strategist",
+  };
+  if (map[type]) return map[type];
+  if (type.startsWith("specialist_")) {
+    const cap = type.replace("specialist_", "");
+    return `${cap.charAt(0).toUpperCase()}${cap.slice(1)} Specialist`;
+  }
+  return "Suite Agent";
 }
 
 export function listAgents(): AgentRecord[] {
@@ -103,6 +120,7 @@ export function getAgent(id: string): AgentRecord | null {
 export function createAgent(input: {
   type: string;
   name: string;
+  jobProfile: string;
   rules: string[];
   guardrails: Guardrail[];
   capabilities: string[];
@@ -114,6 +132,7 @@ export function createAgent(input: {
     id: uuid(),
     type: input.type,
     name: input.name,
+    jobProfile: input.jobProfile,
     status: input.status ?? "online",
     rules: input.rules,
     guardrails: input.guardrails,
@@ -129,14 +148,15 @@ export function createAgent(input: {
   getDb()
     .prepare(
       `INSERT INTO agents (
-        id, type, name, status, rules_json, guardrails_json, capabilities_json,
+        id, type, name, job_profile, status, rules_json, guardrails_json, capabilities_json,
         system_prompt, playbook_json, stats_json, created_at, last_seen_at, last_heartbeat_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       agent.id,
       agent.type,
       agent.name,
+      agent.jobProfile,
       agent.status,
       JSON.stringify(agent.rules),
       JSON.stringify(agent.guardrails),
@@ -149,12 +169,29 @@ export function createAgent(input: {
       agent.lastHeartbeatAt,
     );
 
-  emitEvent("success", "registry", `Agent online: ${agent.name}`, {
+  emitEvent("success", "registry", `Agent online: ${agent.name} · ${agent.jobProfile}`, {
     agentId: agent.id,
     type: agent.type,
   });
 
   return agent;
+}
+
+export function updateAgentIdentity(
+  id: string,
+  input: { name: string; jobProfile: string; systemPrompt?: string },
+) {
+  if (input.systemPrompt) {
+    getDb()
+      .prepare(
+        `UPDATE agents SET name = ?, job_profile = ?, system_prompt = ? WHERE id = ?`,
+      )
+      .run(input.name, input.jobProfile, input.systemPrompt, id);
+  } else {
+    getDb()
+      .prepare(`UPDATE agents SET name = ?, job_profile = ? WHERE id = ?`)
+      .run(input.name, input.jobProfile, id);
+  }
 }
 
 export function updateAgentStatus(id: string, status: AgentStatus) {

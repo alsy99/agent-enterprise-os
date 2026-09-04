@@ -1,9 +1,33 @@
 import type { AgentSpec } from "./types";
 
+const FIRST_NAMES = [
+  "Nova",
+  "Kai",
+  "Remy",
+  "Sable",
+  "Iori",
+  "Vesper",
+  "Quill",
+  "Mira",
+  "Juno",
+  "Onyx",
+  "Pike",
+  "Lumen",
+  "Ash",
+  "Nyx",
+  "Reed",
+  "Sol",
+  "Tess",
+  "Wren",
+  "Zed",
+  "Cleo",
+];
+
 export const BUILTIN_SPECS: AgentSpec[] = [
   {
     type: "orchestrator",
-    name: "Orchestrator",
+    name: "Nova",
+    jobProfile: "Chief Orchestrator",
     description:
       "Routes objectives, spawns missing specialist agents, and coordinates handoffs.",
     capabilities: [
@@ -31,13 +55,15 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You are the suite orchestrator. Keep agents online, route work fairly, and create specialists when capability gaps appear.",
+      "You are Nova, Chief Orchestrator. Keep agents online, route work fairly, and create specialists when capability gaps appear.",
     maxConcurrency: 1,
   },
   {
     type: "researcher",
-    name: "Researcher",
-    description: "Breaks down objectives, gathers context, and drafts investigation plans.",
+    name: "Kai",
+    jobProfile: "Research Analyst",
+    description:
+      "Breaks down objectives, gathers context, and drafts investigation plans.",
     capabilities: ["research", "analyze", "summarize", "plan"],
     rules: [
       "Cite assumptions explicitly.",
@@ -52,13 +78,15 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You research and structure problems so other agents can execute with confidence.",
+      "You are Kai, Research Analyst. Structure problems so other agents can execute with confidence.",
     maxConcurrency: 2,
   },
   {
     type: "builder",
-    name: "Builder",
-    description: "Implements concrete work products: plans, checklists, code sketches, docs.",
+    name: "Remy",
+    jobProfile: "Implementation Engineer",
+    description:
+      "Implements concrete work products: plans, checklists, code sketches, docs.",
     capabilities: ["build", "implement", "write", "refactor"],
     rules: [
       "Ship the smallest complete slice that advances the objective.",
@@ -73,13 +101,15 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You turn assigned tasks into concrete deliverables and leave clean handoff context.",
+      "You are Remy, Implementation Engineer. Turn assigned tasks into concrete deliverables and leave clean handoff context.",
     maxConcurrency: 2,
   },
   {
     type: "reviewer",
-    name: "Reviewer",
-    description: "Checks outputs against rules, guardrails, and objective success criteria.",
+    name: "Sable",
+    jobProfile: "Quality Reviewer",
+    description:
+      "Checks outputs against rules, guardrails, and objective success criteria.",
     capabilities: ["review", "qa", "critique", "validate"],
     rules: [
       "Score against explicit criteria.",
@@ -94,12 +124,13 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You validate work quality, enforce guardrails, and write lasting lessons for the suite.",
+      "You are Sable, Quality Reviewer. Validate work quality, enforce guardrails, and write lasting lessons.",
     maxConcurrency: 2,
   },
   {
     type: "learner",
-    name: "Learner",
+    name: "Iori",
+    jobProfile: "Learning Strategist",
     description:
       "Consolidates memories into playbook updates and improves future agent behavior.",
     capabilities: ["learn", "consolidate", "playbook", "reflect"],
@@ -116,10 +147,20 @@ export const BUILTIN_SPECS: AgentSpec[] = [
       },
     ],
     systemPrompt:
-      "You turn raw memories into durable playbook improvements for every agent.",
+      "You are Iori, Learning Strategist. Turn raw memories into durable playbook improvements.",
     maxConcurrency: 1,
   },
 ];
+
+const JOB_TITLES_BY_CAP: Record<string, string> = {
+  security: "Security Specialist",
+  docs: "Documentation Lead",
+  design: "Design Specialist",
+  data: "Data Specialist",
+  ops: "Operations Specialist",
+  testing: "Test Engineer",
+  support: "Support Specialist",
+};
 
 export function capabilityToPreferredType(capability: string): string {
   const map: Record<string, string> = {
@@ -147,19 +188,40 @@ export function capabilityToPreferredType(capability: string): string {
   return map[capability] ?? `specialist_${capability}`;
 }
 
-export function inventSpecForCapability(capability: string): AgentSpec {
+export function allocateUniqueName(taken: Set<string>, seed: string): string {
+  for (const name of FIRST_NAMES) {
+    if (!taken.has(name.toLowerCase())) return name;
+  }
+  let i = 2;
+  const base = seed
+    .split(/[_-]/)
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join("");
+  while (taken.has(`${base}${i}`.toLowerCase())) i += 1;
+  return `${base}${i}`;
+}
+
+export function inventSpecForCapability(
+  capability: string,
+  takenNames: Set<string> = new Set(),
+): AgentSpec {
   const type = capabilityToPreferredType(capability);
   const existing = BUILTIN_SPECS.find((s) => s.type === type);
   if (existing) return existing;
 
-  const title = capability
-    .split(/[_-]/)
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(" ");
+  const title =
+    JOB_TITLES_BY_CAP[capability] ??
+    `${capability
+      .split(/[_-]/)
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join(" ")} Specialist`;
+
+  const name = allocateUniqueName(takenNames, capability);
 
   return {
     type,
-    name: `${title} Specialist`,
+    name,
+    jobProfile: title,
     description: `Auto-spawned specialist for capability: ${capability}`,
     capabilities: [capability, "general"],
     rules: [
@@ -180,7 +242,7 @@ export function inventSpecForCapability(capability: string): AgentSpec {
         severity: "block",
       },
     ],
-    systemPrompt: `You are a forever-online specialist agent focused on ${capability}. Follow your rules, honor guardrails, learn from outcomes, and leave clean handoff context.`,
+    systemPrompt: `You are ${name}, ${title}. Follow your rules, honor guardrails, learn from outcomes, and leave clean handoff context.`,
     maxConcurrency: 1,
   };
 }
