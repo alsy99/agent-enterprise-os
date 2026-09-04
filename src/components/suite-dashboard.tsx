@@ -203,7 +203,7 @@ export function SuiteDashboard() {
       <main className="relative mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
         <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-lime-300/80">
+            <p className="font-mono text-xs uppercase tracking-[0.28em] text-lime-300">
               Forever Online
             </p>
             <h1 className="font-[family-name:var(--font-display)] text-3xl tracking-tight text-white sm:text-4xl">
@@ -218,7 +218,7 @@ export function SuiteDashboard() {
             >
               {data.worker.running ? "awake" : "paused"}
             </Badge>
-            <span className="font-mono text-xs text-zinc-500">
+            <span className="font-mono text-base text-zinc-300">
               {liveCount} agents · {busyAgents} working · {ongoing.length}{" "}
               active
             </span>
@@ -254,7 +254,7 @@ export function SuiteDashboard() {
             onSubmit={submitObjective}
             className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4"
           >
-            <p className="mb-3 text-sm text-zinc-400">
+            <p className="mb-3 text-base text-zinc-300">
               Tell Nova what to do — she plans steps and assigns the team.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
@@ -264,7 +264,7 @@ export function SuiteDashboard() {
                 placeholder="e.g. Draft a launch checklist with a security pass"
                 required
                 rows={2}
-                className="min-h-[64px] flex-1 border-white/10 bg-black/30"
+                className="min-h-[72px] flex-1 border-white/10 bg-black/30 text-base text-zinc-100 placeholder:text-zinc-500"
               />
               <Button
                 type="submit"
@@ -303,7 +303,7 @@ export function SuiteDashboard() {
             {ongoing.length === 0 ? (
               <div className="rounded-2xl border border-dashed border-white/15 bg-zinc-950/40 px-5 py-12 text-center">
                 <p className="text-zinc-300">No ongoing work</p>
-                <p className="mt-1 text-sm text-zinc-500">
+                <p className="mt-1 text-base text-zinc-400">
                   Queue an objective, or open History for completed work.
                 </p>
               </div>
@@ -325,10 +325,10 @@ export function SuiteDashboard() {
                   >
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-lg font-medium text-white">
+                        <h2 className="text-xl font-medium text-white">
                           {objective.title}
                         </h2>
-                        <p className="mt-1 line-clamp-2 text-sm text-zinc-400">
+                        <p className="mt-1 line-clamp-2 text-base text-zinc-300">
                           {cleanBrief(objective.description)}
                         </p>
                       </div>
@@ -341,7 +341,7 @@ export function SuiteDashboard() {
                     </div>
 
                     <div className="mt-4 space-y-2">
-                      <div className="flex items-center justify-between font-mono text-[11px] text-zinc-500">
+                      <div className="flex items-center justify-between font-mono text-base text-zinc-300">
                         <span>
                           {completed}/{objective.tasks.length} tasks
                         </span>
@@ -358,8 +358,8 @@ export function SuiteDashboard() {
 
                     {active ? (
                       <div className="mt-4 rounded-xl border border-amber-400/20 bg-amber-400/5 px-3 py-3">
-                        <p className="text-sm text-zinc-200">{active.title}</p>
-                        <p className="mt-1 text-xs text-zinc-500">
+                        <p className="text-base text-zinc-100">{active.title}</p>
+                        <p className="mt-1 text-base text-zinc-300">
                           {assignee
                             ? `${assignee.name} · ${assignee.jobProfile}`
                             : `Needs ${active.requiredCapability}`}
@@ -407,15 +407,15 @@ export function SuiteDashboard() {
                       }
                     >
                       <div>
-                        <h2 className="text-lg font-medium text-white">
+                        <h2 className="text-xl font-medium text-white">
                           {item.objective.title}
                         </h2>
-                        <p className="mt-1 text-sm text-zinc-500">
+                        <p className="mt-1 text-base text-zinc-400">
                           {item.participants
                             .map((p) => `${p.name} (${p.jobProfile})`)
                             .join(" · ") || "No agents recorded"}
                         </p>
-                        <p className="mt-2 font-mono text-[11px] text-zinc-600">
+                        <p className="mt-2 font-mono text-base text-zinc-300">
                           {item.tasks.filter((t) => t.status === "completed").length}{" "}
                           tasks · {item.learnings.length} lessons
                           {item.objective.completedAt
@@ -433,12 +433,12 @@ export function SuiteDashboard() {
 
                     {open ? (
                       <div className="space-y-4 border-t border-white/10 px-5 py-4">
-                        <p className="text-sm text-zinc-400">
+                        <p className="text-base text-zinc-300">
                           {cleanBrief(item.objective.description)}
                         </p>
 
                         <div>
-                          <h3 className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                          <h3 className="font-mono text-sm uppercase tracking-wider text-zinc-400">
                             Tasks & agents
                           </h3>
                           <div className="mt-2 space-y-2">
@@ -448,7 +448,7 @@ export function SuiteDashboard() {
                                 className="rounded-xl border border-white/8 bg-black/25 px-3 py-3"
                               >
                                 <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <p className="text-sm text-zinc-200">
+                                  <p className="text-base text-zinc-100">
                                     {t.title}
                                   </p>
                                   <Badge
@@ -458,22 +458,22 @@ export function SuiteDashboard() {
                                     {t.status}
                                   </Badge>
                                 </div>
-                                <p className="mt-1 text-xs text-lime-300/80">
+                                <p className="mt-1 text-base text-lime-300">
                                   {t.agent
                                     ? `${t.agent.name} · ${t.agent.jobProfile}`
                                     : "Unassigned"}
                                 </p>
 
                                 {t.decisions[0] ? (
-                                  <p className="mt-2 text-xs text-zinc-400">
-                                    <span className="text-zinc-500">Why: </span>
+                                  <p className="mt-2 text-base text-zinc-300">
+                                    <span className="font-medium text-zinc-200">Why: </span>
                                     {t.decisions[0].content}
                                   </p>
                                 ) : null}
 
                                 {t.learnings[0] ? (
-                                  <p className="mt-1 text-xs text-zinc-400">
-                                    <span className="text-zinc-500">
+                                  <p className="mt-1 text-base text-zinc-300">
+                                    <span className="font-medium text-zinc-200">
                                       Learned:{" "}
                                     </span>
                                     {t.learnings[0].content}
@@ -482,10 +482,10 @@ export function SuiteDashboard() {
 
                                 {t.result ? (
                                   <details className="mt-2">
-                                    <summary className="cursor-pointer text-xs text-zinc-500">
+                                    <summary className="cursor-pointer text-sm text-zinc-400">
                                       Deliverable
                                     </summary>
-                                    <pre className="mt-2 max-h-40 overflow-auto whitespace-pre-wrap rounded bg-black/40 p-2 font-mono text-[11px] text-zinc-400">
+                                    <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-black/40 p-3 font-mono text-sm leading-relaxed text-zinc-300 soft-scroll">
                                       {t.result}
                                     </pre>
                                   </details>
@@ -497,10 +497,10 @@ export function SuiteDashboard() {
 
                         {item.handoffs.length > 0 ? (
                           <div>
-                            <h3 className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                            <h3 className="font-mono text-sm uppercase tracking-wider text-zinc-400">
                               Handoffs
                             </h3>
-                            <ul className="mt-2 space-y-1 text-sm text-zinc-400">
+                            <ul className="mt-2 space-y-1 text-base text-zinc-300">
                               {item.handoffs.map((h) => (
                                 <li key={h.id}>
                                   {h.from?.name ?? "?"} → {h.to?.name ?? "?"} —{" "}
@@ -513,10 +513,10 @@ export function SuiteDashboard() {
 
                         {item.learnings.length > 0 ? (
                           <div>
-                            <h3 className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                            <h3 className="font-mono text-sm uppercase tracking-wider text-zinc-400">
                               Lessons from this run
                             </h3>
-                            <ul className="mt-2 space-y-1 text-sm text-zinc-400">
+                            <ul className="mt-2 space-y-1 text-base text-zinc-300">
                               {item.learnings.map((l) => (
                                 <li key={l.id}>• {l.content}</li>
                               ))}
@@ -548,10 +548,10 @@ export function SuiteDashboard() {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <h2 className="text-lg font-medium text-white">
+                        <h2 className="text-xl font-medium text-white">
                           {agent.name}
                         </h2>
-                        <p className="mt-0.5 text-sm text-lime-300/90">
+                        <p className="mt-1 text-base text-lime-300">
                           {agent.jobProfile}
                         </p>
                       </div>
@@ -562,10 +562,10 @@ export function SuiteDashboard() {
                         {agent.status}
                       </Badge>
                     </div>
-                    <p className="mt-3 text-xs text-zinc-500">
+                    <p className="mt-3 text-sm text-zinc-400">
                       {agent.capabilities.slice(0, 4).join(" · ")}
                     </p>
-                    <p className="mt-2 font-mono text-[11px] text-zinc-600">
+                    <p className="mt-2 font-mono text-base text-zinc-300">
                       {agent.stats.completed} done · {agent.stats.lessons}{" "}
                       lessons
                     </p>
@@ -574,10 +574,10 @@ export function SuiteDashboard() {
                   {open ? (
                     <div className="space-y-3 border-t border-white/10 px-4 py-3">
                       <div>
-                        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                        <p className="font-mono text-sm uppercase tracking-wider text-zinc-400">
                           Playbook / learning
                         </p>
-                        <ul className="mt-2 space-y-1 text-xs text-zinc-400">
+                        <ul className="mt-2 space-y-2 text-base text-zinc-300">
                           {agent.playbook.length === 0 ? (
                             <li>No lessons yet</li>
                           ) : (
@@ -588,10 +588,10 @@ export function SuiteDashboard() {
                         </ul>
                       </div>
                       <div>
-                        <p className="font-mono text-[11px] uppercase tracking-wider text-zinc-500">
+                        <p className="font-mono text-sm uppercase tracking-wider text-zinc-400">
                           Guardrails
                         </p>
-                        <ul className="mt-2 space-y-1 text-xs text-zinc-400">
+                        <ul className="mt-2 space-y-2 text-base text-zinc-300">
                           {agent.guardrails.slice(0, 3).map((g) => (
                             <li key={g.id}>
                               • [{g.severity}] {g.rule}
