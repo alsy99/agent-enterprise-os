@@ -8,78 +8,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { apiFetch } from "@/lib/api";
 import type {
-  AgentRecord,
   ChatMessage,
-  Handoff,
-  MemoryEntry,
-  Objective,
   SuiteEvent,
   Task,
-  WorkerState,
 } from "@/lib/suite/types";
+import type {
+  SuiteSnapshot,
+  SuiteView,
+} from "@/lib/suite/snapshot";
 
-type ObjectiveWithTasks = Objective & { tasks: Task[] };
-
-type HistoryTask = Task & {
-  agent: { id: string; name: string; jobProfile: string } | null;
-  decisions: MemoryEntry[];
-  learnings: MemoryEntry[];
-};
-
-type HistoryItem = {
-  objective: Objective;
-  tasks: HistoryTask[];
-  participants: Array<{ id: string; name: string; jobProfile: string }>;
-  handoffs: Array<
-    Handoff & {
-      from: { name: string; jobProfile: string } | null;
-      to: { name: string; jobProfile: string } | null;
-    }
-  >;
-  learnings: MemoryEntry[];
-  decisions: MemoryEntry[];
-  events: SuiteEvent[];
-};
-
-type SkillMeta = {
-  id: string;
-  name: string;
-  description: string;
-  capability: string;
-};
-
-type Snapshot = {
-  worker: WorkerState;
-  objectives: ObjectiveWithTasks[];
-  agents: AgentRecord[];
-  history: HistoryItem[];
-  skills: SkillMeta[];
-};
-
-const empty: Snapshot = {
-  worker: { running: false, ticks: 0, mode: "embedded" },
-  objectives: [],
-  agents: [],
-  history: [],
-  skills: [],
-};
-
-type View = "board" | "history" | "agents" | "skills" | "talk";
+type View = SuiteView;
+type Snapshot = SuiteSnapshot;
 
 const VIEW_IDS: View[] = ["board", "history", "agents", "skills", "talk"];
-
-function readViewFromUrl(): View {
-  if (typeof window === "undefined") return "board";
-  const raw = new URLSearchParams(window.location.search).get("view");
-  if (raw && VIEW_IDS.includes(raw as View)) return raw as View;
-  try {
-    const stored = sessionStorage.getItem("suite-view");
-    if (stored && VIEW_IDS.includes(stored as View)) return stored as View;
-  } catch {
-    /* ignore */
-  }
-  return "board";
-}
 
 function statusTone(status: string) {
   switch (status) {
@@ -121,39 +62,38 @@ function cleanBrief(text: string) {
   return text.replace(/\s*\[cap:[^\]]+\]/gi, "");
 }
 
-export function SuiteDashboard() {
-  const [data, setData] = useState<Snapshot>(empty);
-  const [view, setView] = useState<View>("board");
-  const [hydrated, setHydrated] = useState(false);
+export function SuiteDashboard({
+  initialView = "board",
+  initialData,
+}: {
+  initialView?: View;
+  initialData: Snapshot;
+}) {
+  const [data, setData] = useState<Snapshot>(initialData);
+  const [view, setView] = useState<View>(
+    VIEW_IDS.includes(initialView) ? initialView : "board",
+  );
   const [task, setTask] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showDispatch, setShowDispatch] = useState(false);
-  const [openHistoryId, setOpenHistoryId] = useState<string | null>(null);
+  const [openHistoryId, setOpenHistoryId] = useState<string | null>(
+    initialView === "history" ? (initialData.history[0]?.objective.id ?? null) : null,
+  );
   const [openAgentId, setOpenAgentId] = useState<string | null>(null);
   const [talkAgentId, setTalkAgentId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
+  // Keep local view in sync when the server re-renders with a new ?view=
   useEffect(() => {
-    // Read URL/session only after mount — never wipe ?view= before this runs.
-    setView(readViewFromUrl());
-    setHydrated(true);
-  }, []);
+    setView(VIEW_IDS.includes(initialView) ? initialView : "board");
+  }, [initialView]);
 
   useEffect(() => {
-    if (!hydrated) return;
-    try {
-      sessionStorage.setItem("suite-view", view);
-    } catch {
-      /* ignore */
-    }
-    const url = new URL(window.location.href);
-    if (view === "board") url.searchParams.delete("view");
-    else url.searchParams.set("view", view);
-    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-  }, [view, hydrated]);
+    setData(initialData);
+  }, [initialData]);
 
   const refresh = useCallback(async () => {
     try {
@@ -175,7 +115,7 @@ export function SuiteDashboard() {
       );
       const [workerJson, objJson, agentJson, historyJson, skillsJson] = bodies;
       setData({
-        worker: workerJson.worker ?? empty.worker,
+        worker: workerJson.worker ?? initialData.worker,
         objectives: objJson.objectives ?? [],
         agents: agentJson.agents ?? [],
         history: historyJson.history ?? [],
@@ -185,10 +125,9 @@ export function SuiteDashboard() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load suite");
     }
-  }, []);
+  }, [initialData.worker]);
 
   useEffect(() => {
-    refresh();
     const id = setInterval(refresh, 2000);
     return () => clearInterval(id);
   }, [refresh]);
@@ -201,7 +140,7 @@ export function SuiteDashboard() {
   }, [view, data.history, openHistoryId]);
 
   const agentById = useMemo(() => {
-    const map = new Map<string, AgentRecord>();
+    const map = new Map<string, (typeof data.agents)[number]>();
     for (const a of data.agents) map.set(a.id, a);
     return map;
   }, [data.agents]);
@@ -413,10 +352,6 @@ export function SuiteDashboard() {
                 href={href}
                 role="tab"
                 aria-selected={active}
-                onClick={(e) => {
-                  e.preventDefault();
-                  setView(tab.id);
-                }}
                 className={
                   active
                     ? "inline-flex h-7 items-center rounded-lg bg-white px-2.5 text-[0.8rem] font-medium text-zinc-950"
