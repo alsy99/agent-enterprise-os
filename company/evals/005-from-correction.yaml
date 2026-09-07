@@ -1,0 +1,8 @@
+# id: "005"
+name: from-correction-sent-tone-implied-email-already-went-out
+skill: unknown
+input: |
+  draft outreach 
+expect:
+  from_correction: true
+  should_note: Keep send_status awaiting_approval and stop
