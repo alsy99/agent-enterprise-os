@@ -65,18 +65,20 @@ function cleanBrief(text: string) {
 export function SuiteDashboard({
   initialView = "board",
   initialData,
+  showDispatch = false,
+  formError = null,
 }: {
   initialView?: View;
   initialData: Snapshot;
+  showDispatch?: boolean;
+  formError?: string | null;
 }) {
   const [data, setData] = useState<Snapshot>(initialData);
   const [view, setView] = useState<View>(
     VIEW_IDS.includes(initialView) ? initialView : "board",
   );
-  const [task, setTask] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showDispatch, setShowDispatch] = useState(false);
+  const [error, setError] = useState<string | null>(formError);
   const [openHistoryId, setOpenHistoryId] = useState<string | null>(
     initialView === "history" ? (initialData.history[0]?.objective.id ?? null) : null,
   );
@@ -156,43 +158,8 @@ export function SuiteDashboard({
 
   const busyAgents = data.agents.filter((a) => a.status === "busy").length;
 
-  async function submitObjective(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      const res = await apiFetch("/api/objectives", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ task }),
-      });
-      if (!res.ok) {
-        const body = await res.json();
-        throw new Error(body.error || "Failed to create objective");
-      }
-      setTask("");
-      setShowDispatch(false);
-      setView("board");
-      await refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Submit failed");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function workerAction(action: "start" | "stop") {
-    setBusy(true);
-    try {
-      await apiFetch("/api/worker", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
-      });
-      await refresh();
-    } finally {
-      setBusy(false);
-    }
-  }
+  const returnPath =
+    view === "board" ? "/" : view === "history" ? "/history" : `/${view}`;
 
   const talkAgent = useMemo(
     () => data.agents.find((a) => a.id === talkAgentId) ?? null,
@@ -277,24 +244,45 @@ export function SuiteDashboard({
               {liveCount} agents · {busyAgents} working · {ongoing.length}{" "}
               active
             </span>
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={busy}
-              onClick={() =>
-                workerAction(data.worker.running ? "stop" : "start")
-              }
-              className="border-white/15 bg-white/5"
+            <form
+              method="post"
+              action="/api/worker/form"
+              className="inline"
+              onSubmit={() => setBusy(true)}
             >
-              {data.worker.running ? "Pause" : "Wake"}
-            </Button>
-            <Button
-              size="sm"
-              onClick={() => setShowDispatch((v) => !v)}
-              className="bg-lime-400 text-zinc-950 hover:bg-lime-300"
-            >
-              {showDispatch ? "Close" : "New objective"}
-            </Button>
+              <input type="hidden" name="action" value={data.worker.running ? "stop" : "start"} />
+              <input type="hidden" name="returnTo" value={returnPath} />
+              <button
+                type="submit"
+                disabled={busy}
+                className="inline-flex h-7 items-center rounded-lg border border-white/15 bg-white/5 px-2.5 text-[0.8rem] font-medium text-zinc-100"
+              >
+                {data.worker.running ? "Pause" : "Wake"}
+              </button>
+            </form>
+            {showDispatch ? (
+              <a
+                href="/"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.assign("/");
+                }}
+                className="inline-flex h-7 items-center rounded-lg border border-white/15 bg-transparent px-2.5 text-[0.8rem] font-medium text-zinc-100"
+              >
+                Close
+              </a>
+            ) : (
+              <a
+                href="/new"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.assign("/new");
+                }}
+                className="inline-flex h-7 items-center rounded-lg bg-lime-400 px-2.5 text-[0.8rem] font-medium text-zinc-950 hover:bg-lime-300"
+              >
+                New objective
+              </a>
+            )}
           </div>
         </header>
 
@@ -306,7 +294,8 @@ export function SuiteDashboard({
 
         {showDispatch ? (
           <form
-            onSubmit={submitObjective}
+            method="post"
+            action="/api/objectives/form"
             className="rounded-2xl border border-white/10 bg-zinc-950/60 p-4"
           >
             <p className="mb-3 text-base text-zinc-300">
@@ -314,29 +303,19 @@ export function SuiteDashboard({
               (orchestrator-workers). Try “introduce all the agents”.
             </p>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-              <Textarea
-                value={task}
-                onChange={(e) => setTask(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!busy && task.trim()) {
-                      e.currentTarget.form?.requestSubmit();
-                    }
-                  }
-                }}
-                placeholder="e.g. Draft a launch checklist with a security pass"
+              <textarea
+                name="task"
                 required
-                rows={2}
-                className="min-h-[72px] flex-1 border-white/10 bg-black/30 text-base text-zinc-100 placeholder:text-zinc-500"
+                rows={3}
+                placeholder="e.g. Draft a launch checklist with a security pass"
+                className="min-h-[72px] w-full flex-1 rounded-lg border border-white/10 bg-black/30 px-3 py-2 text-base text-zinc-100 placeholder:text-zinc-500"
               />
-              <Button
+              <button
                 type="submit"
-                disabled={busy || !task.trim()}
-                className="bg-lime-400 text-zinc-950 hover:bg-lime-300 sm:self-stretch"
+                className="inline-flex h-9 items-center justify-center rounded-lg bg-lime-400 px-4 text-sm font-medium text-zinc-950 hover:bg-lime-300 sm:self-stretch"
               >
                 Send to Nova
-              </Button>
+              </button>
             </div>
           </form>
         ) : null}
