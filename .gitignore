@@ -3,6 +3,7 @@
 .DS_Store
 *.pem
 .env*
+!.env.example
 *.log
 
 # Local harness junk
