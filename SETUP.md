@@ -9,18 +9,23 @@
 5. Wire models (route by job — see `integrations/models/`):
 
 ```bash
-cp .env.example .env
-# optional proxy:
-pip install 'litellm[proxy]'
+cp .env.example .env   # fill keys
+# Install once:
+#   curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --skip-setup
+#   brew install anomalyco/tap/opencode
+#   uv tool install 'litellm[proxy]' --with prisma
+#   npm i -g promptfoo
+# optional proxy (unset DATABASE_URL until Prisma client is generated):
 set -a && source .env && set +a
+unset DATABASE_URL   # week-1: master_key auth only; virtual keys need Prisma+DB
 litellm --config integrations/litellm/config.yaml --port 4000
-# OpenCode: configs/opencode.models.example.json
-# Hermes:  source configs/hermes.env.example
+# OpenCode: repo-root opencode.json (direct) or configs/opencode.models.example.json (via LiteLLM)
+# Hermes:  source configs/hermes.env.example  OR hermes config (gemini + keys in ~/.hermes/.env)
+# Run Hermes/OpenCode with cwd = this repo root so AGENTS.md + skills/ load
 ./scripts/resolve-model.sh market-research
 ./scripts/resolve-model.sh sales-outbound verifier
 ```
-
-**Week-1 defaults:** Flash-Lite = worker, Flash = planner, Groq gpt-oss = verifier. Add NIM GLM-5.2 only when coding quality bottlenecks.
+**Week-1 defaults:** Flash-Lite = worker, Flash (`gemini-3.6-flash`) = planner, Groq gpt-oss = verifier. Coder = Codestral (free). Add NIM Nemotron Super only when coding quality bottlenecks.
 
 Steal skills later from: anthropics/skills, obra/superpowers, wshobson/agents — audit scripts; do not install thousands.
 
@@ -30,7 +35,7 @@ Default loop: **market-research → sales-outbound (draft only)**.
 
 Example prompt:
 
-> Load AGENTS.md. Run market-research for lead Acme Robotics, write a wiki page, then sales-outbound draft into artifacts/outreach-drafts/. Do not send.
+> Load AGENTS.md. Run market-research for lead Clay, write a wiki page, then sales-outbound draft into artifacts/outreach-drafts/. Do not send.
 
 ## Days 5–6 — correction protocol
 

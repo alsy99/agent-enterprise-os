@@ -50,7 +50,7 @@ Do not pick one model. Route by job:
 - **Worker:** Gemini Flash-Lite  
 - **Planner:** Gemini Flash  
 - **Verifier:** Groq `openai/gpt-oss-120b` (different family)  
-- **Coder (later):** NVIDIA GLM-5.2  
+- **Coder (when needed):** Mistral Codestral (free); NIM Nemotron Super as trial alternate  
 
 Details: [integrations/models/README.md](./integrations/models/README.md) · `.env.example`
 

@@ -8,6 +8,7 @@
 
 # Local harness junk
 /node_modules/
+/.venv/
 /.next/
 /out/
 /data/

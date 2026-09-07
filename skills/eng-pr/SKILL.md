@@ -16,7 +16,7 @@ metadata:
 
 # Models
 
-- **Actor:** `coder` (NIM GLM-5.2 / Laguna / Codestral)
+- **Actor:** `coder` (Mistral Codestral free; NIM Nemotron Super alternate)
 - **Verifier:** tests first; LLM second opinion = `worker` or `verifier` (Groq) — not another coding model agreeing with itself
 - No customer PII on NIM trial
 - Resolve: `./scripts/resolve-model.sh eng-pr`

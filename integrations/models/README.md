@@ -13,7 +13,7 @@ Route by job. Free tiers stand up the loop; they do not run a company at 95% aut
 1. **Worker:** Gemini Flash-Lite  
 2. **Planner / research:** Gemini Flash  
 3. **Verifier:** Groq `openai/gpt-oss-120b` (different family)  
-4. **Coder (when needed):** NVIDIA GLM-5.2 / Nemotron Super  
+4. **Coder (when needed):** Mistral Codestral (free) / NIM Nemotron Super (trial)  
 5. **Failover:** OpenRouter `:free` (prefer $10 top-up)
 
 ## Resolve

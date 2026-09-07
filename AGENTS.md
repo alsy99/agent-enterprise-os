@@ -60,7 +60,7 @@ Do not use one model for everything. Roles live in `integrations/models/router.y
 | planner | Gemini Flash | research, SOP writing, tool-heavy plans |
 | worker | Gemini Flash-Lite | drafts, extract, short tool steps |
 | verifier | Groq gpt-oss-120b | second opinion — **different family than actor** |
-| coder | NIM GLM-5.2 | eng-pr when Gemini is weak |
+| coder | Mistral Codestral (free) | eng-pr when Gemini is weak |
 | thinker | GLM-4.7-Flash | rare SOP/trace review (1 concurrent) |
 
 Week-1 default: Flash-Lite worker, Flash planner, Groq verifier. Resolve with `./scripts/resolve-model.sh <skill> [actor|verifier]`.

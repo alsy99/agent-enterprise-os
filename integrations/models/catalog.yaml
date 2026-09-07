@@ -1,5 +1,6 @@
 # Catalog of OpenAI-compatible endpoints for Hermes / OpenCode / LiteLLM.
 # Keys live in .env — never commit secrets.
+# Prefer free-tier IDs verified working (2026-09-07 smoke).
 
 version: 1
 
@@ -7,37 +8,38 @@ providers:
   google:
     base_url: https://generativelanguage.googleapis.com/v1beta/openai/
     api_key_env: GOOGLE_API_KEY
-    notes: AI Studio. India OK. Free-tier block is EEA/UK/CH. Prompts may train Google.
+    notes: AI Studio free. India OK. Free-tier block is EEA/UK/CH. Prompts may train Google. gemini-2.5-* blocked for new keys.
   groq:
     base_url: https://api.groq.com/openai/v1
     api_key_env: GROQ_API_KEY
-    notes: Speed path. Llama 3.3 on Groq shut Aug 2026 — use gpt-oss / Qwen.
+    notes: Free speed path. Llama 3.3 on Groq shut Aug 2026 — use gpt-oss / Qwen.
   nvidia_nim:
     base_url: https://integrate.api.nvidia.com/v1
     api_key_env: NVIDIA_API_KEY
-    notes: Trial/dev ToS — no customer PII. Phone verify.
+    notes: Trial/dev ToS — no customer PII. Phone verify. Many 2025 IDs EOL Aug 2026.
   openrouter:
     base_url: https://openrouter.ai/api/v1
     api_key_env: OPENROUTER_API_KEY
-    notes: Free = 50 RPD until $10 top-up → 1000 RPD. Hosts may train.
+    notes: Free pool = 50 RPD until $10 top-up → 1000 RPD. Hosts may train. Named :free slugs rotate.
   mistral:
     base_url: https://api.mistral.ai/v1
     api_key_env: MISTRAL_API_KEY
-    notes: Experiment / prototyping ToS for free tiers.
+    notes: Free/experiment tier for Codestral prototyping.
   zai:
     base_url: https://open.bigmodel.cn/api/paas/v4
     api_key_env: ZAI_API_KEY
-    notes: GLM-4.7-Flash permanent free reasoning; 1 concurrent request.
+    notes: GLM flash permanent free; 1 concurrent. Prefer 4.7; 4.5 fallback.
 
 models:
   gemini-flash:
     provider: google
-    # Prefer newest Flash on free list; pin explicitly in your Studio account.
-    id: gemini-3.5-flash
-    aliases: [gemini-3.6-flash, gemini-2.5-flash]
+    id: gemini-3.6-flash
+    aliases: [gemini-3.5-flash, gemini-flash-latest]
     role_default: planner
     limits: { rpm: 15, rpd: 1500 }
     strengths: [1m_context, vision, audio, tools]
+    tier: free
+    notes: gemini-2.5-flash gone for new Studio keys; 3.5-flash may 503 under load.
 
   gemini-flash-lite:
     provider: google
@@ -46,6 +48,7 @@ models:
     role_default: worker
     limits: { rpm: 30, rpd: 1500 }
     strengths: [volume, short_tools]
+    tier: free
 
   groq-gpt-oss:
     provider: groq
@@ -53,6 +56,7 @@ models:
     role_default: verifier
     limits: { rpm: 30, rpd: 1000 }
     strengths: [speed, second_opinion]
+    tier: free
 
   groq-qwen:
     provider: groq
@@ -60,41 +64,24 @@ models:
     role_default: worker
     limits: { rpm: 30, rpd: 1000 }
     strengths: [speed, support_macros]
+    tier: free
 
-  nim-glm-5.2:
-    provider: nvidia_nim
-    id: z-ai/glm-5.2
-    role_default: coder
-    limits: { rpm: 40 }
-    strengths: [coding, agents]
-    restrictions: [no_customer_pii]
-
-  nim-nemotron-super:
-    provider: nvidia_nim
-    id: nvidia/nemotron-3-super-120b-a12b
-    role_default: thinker
-    strengths: [hard_reasoning, planning]
-    restrictions: [no_customer_pii]
-
-  nim-laguna-s:
-    provider: nvidia_nim
-    id: poolside/laguna-s-2.1
-    role_default: coder
-    strengths: [code]
-    restrictions: [no_customer_pii]
-
-  nim-laguna-xs:
-    provider: nvidia_nim
-    id: poolside/laguna-xs-2.1
-    role_default: coder
-    strengths: [code_fast]
-    restrictions: [no_customer_pii]
-
+  # Free coder path (verified). NIM GLM-5.2 EOL 2026-08-21.
   mistral-codestral:
     provider: mistral
     id: codestral-latest
     role_default: coder
     strengths: [code]
+    tier: free
+
+  nim-nemotron-super:
+    provider: nvidia_nim
+    id: nvidia/nemotron-3-super-120b-a12b
+    role_default: thinker
+    strengths: [hard_reasoning, planning, code]
+    restrictions: [no_customer_pii]
+    tier: trial_free
+    notes: Verified alive 2026-09-07. Alternate coder when Codestral weak.
 
   zai-glm-4.7-flash:
     provider: zai
@@ -102,19 +89,24 @@ models:
     role_default: thinker
     limits: { concurrent: 1 }
     strengths: [sop_planning, trace_review]
+    tier: free
+
+  zai-glm-4.5-flash:
+    provider: zai
+    id: glm-4.5-flash
+    role_default: thinker
+    limits: { concurrent: 1 }
+    strengths: [sop_planning, trace_review]
+    tier: free
+    notes: Fallback when 4.7 returns capacity 429.
 
   openrouter-free-pool:
     provider: openrouter
     id: openrouter/free
     role_default: failover
     limits: { rpm: 20, rpd: 50 }
-    notes: After $10 top-up → ~1000 RPD. Routes may include Nemotron/Laguna/Gemma.
-
-  openrouter-laguna-free:
-    provider: openrouter
-    id: poolside/laguna-s-2.1:free
-    role_default: coder
-    limits: { rpd: 50 }
+    notes: After $10 top-up → ~1000 RPD.
+    tier: free
 
 skip_as_primary:
   - cohere # 1000 calls/month non-commercial
@@ -122,3 +114,5 @@ skip_as_primary:
   - cloudflare_workers_ai # shared 10K neurons/day
   - huggingface_serverless # ~$0.10 credit
   - gemini_pro_free # ~5 RPM / ~50 RPD — rare hard judgments only
+  - nim-glm-5.2 # EOL 2026-08-21
+  - poolside-laguna-free # 429 / rotating free availability

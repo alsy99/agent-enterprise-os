@@ -1,0 +1,29 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "google/gemini-3.6-flash",
+  "provider": {
+    "google": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Google AI (direct)",
+      "options": {
+        "baseURL": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "apiKey": "{env:GOOGLE_API_KEY}"
+      },
+      "models": {
+        "gemini-3.6-flash": { "name": "gemini-3.6-flash" },
+        "gemini-3.5-flash-lite": { "name": "gemini-3.5-flash-lite" }
+      }
+    },
+    "groq": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Groq (verifier)",
+      "options": {
+        "baseURL": "https://api.groq.com/openai/v1",
+        "apiKey": "{env:GROQ_API_KEY}"
+      },
+      "models": {
+        "openai/gpt-oss-120b": { "name": "openai/gpt-oss-120b" }
+      }
+    }
+  }
+}

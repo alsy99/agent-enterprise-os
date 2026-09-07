@@ -1,6 +1,7 @@
 # Company OS — model router
 # Do not pick one “best” model. Route by job.
 # Verifier MUST be a different family than the actor.
+# Free-tier defaults verified 2026-09-07.
 
 version: 1
 policy:
@@ -14,7 +15,7 @@ policy:
     worker: gemini-flash-lite
     planner: gemini-flash
     verifier: groq-gpt-oss
-    add_when_coding_bottleneck: nim-glm-5.2
+    add_when_coding_bottleneck: mistral-codestral
 
 roles:
   planner:
@@ -34,21 +35,21 @@ roles:
     primary: groq-gpt-oss
     alternate:
       - zai-glm-4.7-flash
+      - zai-glm-4.5-flash
       - gemini-flash
     rule: never_same_family_as_actor
   coder:
     description: Hard coding / PR slices
-    primary: nim-glm-5.2
+    primary: mistral-codestral
     alternate:
-      - nim-laguna-s
-      - mistral-codestral
       - nim-nemotron-super
     fallback:
-      - openrouter-laguna-free
+      - openrouter-free-pool
   thinker:
     description: Plan SOP / review trace — not high-volume actions
     primary: zai-glm-4.7-flash
     fallback:
+      - zai-glm-4.5-flash
       - nim-nemotron-super
   failover:
     description: When Google/NIM/Groq 429
