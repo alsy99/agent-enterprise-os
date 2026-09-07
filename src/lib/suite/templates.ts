@@ -172,7 +172,9 @@ export const BUILTIN_SPECS: AgentSpec[] = [
 const JOB_TITLES_BY_CAP: Record<string, string> = {
   security: "Security Specialist",
   docs: "Documentation Lead",
-  design: "Design Specialist",
+  design: "Product Designer",
+  deploy: "Release Engineer",
+  monitor: "Observability Lead",
   data: "Data Specialist",
   ops: "Operations Specialist",
   testing: "Test Engineer",

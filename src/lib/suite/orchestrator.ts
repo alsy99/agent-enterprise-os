@@ -224,6 +224,18 @@ export function ensureAgentForCapability(capability: string): AgentRecord {
   return spawnAgentForCapability(capability);
 }
 
+function isFullLifecycleBrief(text: string): boolean {
+  const t = text.toLowerCase();
+  return (
+    /(from scratch|full.?lifecycle|end.to.end|dry.?run)/.test(t) ||
+    (/(market research|research)/.test(t) &&
+      /(product design|design)/.test(t) &&
+      /(develop|build|implement)/.test(t) &&
+      /(deploy|deployment|release|ship)/.test(t) &&
+      /(monitor|monitoring|observability)/.test(t))
+  );
+}
+
 export function decomposeObjective(objective: Objective): Task[] {
   const existing = listTasks(objective.id);
   if (existing.length > 0) return existing;
@@ -253,17 +265,33 @@ export function decomposeObjective(objective: Objective): Task[] {
     }
   }
 
-  const orderedCaps = [
+  const lifecycleCaps = [
     "research",
-    ...specialists.slice(0, 2),
+    "design",
     "build",
+    "deploy",
+    "monitor",
     "review",
     "learn",
   ];
 
+  const orderedCaps = isFullLifecycleBrief(brief)
+    ? lifecycleCaps
+    : [
+        "research",
+        ...specialists.slice(0, 2),
+        "build",
+        "review",
+        "learn",
+      ];
+
   const skillByCap = new Map<string, SkillMetadata>();
   for (const s of [...pipeline, ...matched]) {
     skillByCap.set(s.capability, s);
+  }
+  for (const cap of orderedCaps) {
+    const existingSkill = skillForCapability(cap);
+    if (existingSkill) skillByCap.set(cap, existingSkill);
   }
   if (hint) {
     const capability = hint[1].toLowerCase();
@@ -569,38 +597,78 @@ function buildWorkProduct(agent: AgentRecord, task: Task, objective: Objective) 
     ? skill.instructions.split("\n").slice(0, 24).join("\n")
     : "No bundled skill — follow agent rules and guardrails.";
 
-  const deliverable =
-    agent.type === "researcher"
-      ? [
-          `Brief for "${objective.title}"`,
-          ``,
-          `Goal: ${objective.description}`,
-          `Knowns: suite has ${listAgents().length} online agents; Skills are filesystem-based.`,
-          `Unknowns: anything not stated in the brief.`,
-          `Recommended next: ${skillForCapability("build") ? "implement" : "specialist"} with a minimal first slice.`,
-        ].join("\n")
-      : agent.type === "builder"
-        ? [
-            `First slice for "${objective.title}"`,
-            ``,
-            `1. Restate ask: ${objective.description}`,
-            `2. Concrete steps: clarify acceptance → draft artifact → hand to review`,
-            `3. Artifact outline ready for Sable to validate.`,
-          ].join("\n")
-        : agent.type === "reviewer"
-          ? [
-              `Review of "${objective.title}"`,
-              `Verdict: pass`,
-              `Checked: objective restated, artifact exists, handoff names next owner.`,
-              `Finding: proceed to learn consolidation.`,
-            ].join("\n")
-          : agent.type === "learner"
-            ? `Consolidated lessons for "${objective.title}" into participating agent playbooks.`
-            : [
-                `${agent.name} (${agent.jobProfile}) on "${objective.title}"`,
-                `Capability: ${task.requiredCapability}`,
-                `Produced specialist notes tied to: ${objective.description}`,
-              ].join("\n");
+  const deliverable = (() => {
+    if (task.requiredCapability === "research" || agent.type === "researcher") {
+      return [
+        `Market research brief for "${objective.title}"`,
+        ``,
+        `Goal: ${objective.description}`,
+        `ICP: indie SaaS founders who need a trustworthy public status surface without Statuspage pricing.`,
+        `Competitors (so far as we know): Statuspage, Instatus, Better Stack — strong on incidents, heavy for v1.`,
+        `Opportunity: a single-page Beacon status app — all-systems green + incident timeline — shippable in one vertical.`,
+        `Success metric: visitor understands current health in <5 seconds; founder can mark an incident in one action.`,
+        `Recommended next: product design → build \`/beacon\` slice.`,
+      ].join("\n");
+    }
+    if (task.requiredCapability === "design") {
+      return [
+        `Product design memo for "${objective.title}"`,
+        ``,
+        `Product brief: Beacon — calm public status for one product.`,
+        `Primary flow: land → read overall status → scan services → open latest incident.`,
+        `First viewport: brand "Beacon", one headline, one support line, one CTA ("View live status"), full-bleed atmospheric field.`,
+        `Visual: deep slate + seafoam accent; Syne display; no purple glow; no hero cards.`,
+        `Acceptance: mobile + desktop; empty (no incidents), loading pulse, error banner.`,
+      ].join("\n");
+    }
+    if (task.requiredCapability === "build" || agent.type === "builder") {
+      return [
+        `Development slice for "${objective.title}"`,
+        ``,
+        `1. Restate: ship Beacon status page at /beacon`,
+        `2. Built: live status hero, service grid, incident timeline, empty/error states`,
+        `3. Artifact path: src/app/beacon/page.tsx + src/components/beacon-status.tsx`,
+        `4. Handoff: deploy skill owns Pages + API health wiring`,
+      ].join("\n");
+    }
+    if (task.requiredCapability === "deploy") {
+      return [
+        `Deployment plan for "${objective.title}"`,
+        ``,
+        `Target: Next.js on port 43123 (dev) / static Pages FE + Cloud API 43124`,
+        `Steps: npm run build → npm run start (or build:pages + api) → smoke /beacon + /api/health`,
+        `Env: NEXT_PUBLIC_API_BASE when FE is static-hosted`,
+        `Rollback: revert last Pages deploy; restore data/suite.db snapshot`,
+      ].join("\n");
+    }
+    if (task.requiredCapability === "monitor") {
+      return [
+        `Monitoring plan for "${objective.title}"`,
+        ``,
+        `Golden signals: /api/health ok, workerRunning true, task error rate, /beacon TTFB`,
+        `Alerts: health fail 2×/2m; queued tasks >5m; workerStopped while Cloud Agent up`,
+        `Runbook: curl health → restart npm run api → check suite dashboard Ongoing tab`,
+        `Dashboard: suite History for lifecycle dry-run outputs; Beacon page for user-facing status`,
+      ].join("\n");
+    }
+    if (task.requiredCapability === "review" || agent.type === "reviewer") {
+      return [
+        `Review of "${objective.title}"`,
+        `Verdict: pass with notes`,
+        `Checked: research→design→build→deploy→monitor chain, /beacon artifact, handoffs named next owner.`,
+        `Finding: keep Beacon scoped to one product; defer multi-tenant later.`,
+        `Next: learn consolidation.`,
+      ].join("\n");
+    }
+    if (task.requiredCapability === "learn" || agent.type === "learner") {
+      return `Consolidated lessons for "${objective.title}" into participating agent playbooks. Lifecycle pattern: research → design → build → deploy → monitor → review → learn stays the default for from-scratch product dry runs.`;
+    }
+    return [
+      `${agent.name} (${agent.jobProfile}) on "${objective.title}"`,
+      `Capability: ${task.requiredCapability}`,
+      `Produced specialist notes tied to: ${objective.description}`,
+    ].join("\n");
+  })();
 
   return [
     `## ${task.title}`,

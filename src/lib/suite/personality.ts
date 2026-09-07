@@ -137,6 +137,8 @@ const CAP_ARCHETYPE: Record<string, number> = {
   security: 5,
   docs: 6,
   design: 7,
+  deploy: 8,
+  monitor: 8,
   data: 8,
   testing: 3,
   ops: 8,

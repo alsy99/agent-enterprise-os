@@ -24,6 +24,9 @@ const SKILLS_ROOT = path.join(process.cwd(), "skills");
   learn: "learn",
   "security-pass": "security",
   docs: "docs",
+  design: "design",
+  deploy: "deploy",
+  monitor: "monitor",
 };
 
 function parseFrontmatter(raw: string): {

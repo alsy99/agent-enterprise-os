@@ -15,8 +15,9 @@ Designed against Anthropic’s guidance:
 | Transparency | Plans, assignment “why”, and handoffs are persisted and shown in History |
 | Progressive disclosure (Skills) | `skills/*/SKILL.md` — metadata for discovery; full instructions load only when a step runs |
 | Description = what + when | Every Skill frontmatter states both so Nova can match briefs |
-| Start simple | Single task input; default pipeline is research → (specialists) → implement → review → learn |
+| Start simple | Single task input; default pipeline is research → (specialists) → implement → review → learn. Full-lifecycle briefs expand to research → design → build → deploy → monitor → review → learn |
 | Guardrails + stopping conditions | Per-agent guardrails; spawn caps; one worker turn per tick |
+| Lifecycle dry run | **Beacon** at `/beacon` — market research through monitoring as one objective |
 
 ## What it does
 
@@ -73,7 +74,10 @@ List Skills (Level 1 metadata): `GET /api/skills`
 skills/
   nova-orchestrate/SKILL.md
   research/SKILL.md
+  design/SKILL.md
   implement/SKILL.md
+  deploy/SKILL.md
+  monitor/SKILL.md
   review/SKILL.md
   learn/SKILL.md
   security-pass/SKILL.md
@@ -81,6 +85,18 @@ skills/
 ```
 
 Each file uses Claude-style YAML frontmatter (`name`, `description`) plus instructions. Add a new folder + `SKILL.md` and Nova can discover it on the next plan.
+
+## Lifecycle dry run (Beacon)
+
+Product slice at [`/beacon`](http://127.0.0.1:43123/beacon) — notes in `artifacts/beacon/`.
+
+```bash
+curl -X POST http://127.0.0.1:43123/api/objectives \
+  -H 'content-type: application/json' \
+  -d '{"task":"Full lifecycle dry run from scratch: market research, product design, development, deployment, and monitoring for Beacon — a public status page for indie SaaS founders."}'
+```
+
+Watch Ongoing → History for stage outputs from Kai, design/deploy/monitor specialists, Remy, Sable, and Iori.
 
 ## Architecture
 
@@ -92,6 +108,7 @@ Each file uses Claude-style YAML frontmatter (`name`, `description`) plus instru
 | `src/lib/suite/worker.ts` | Forever tick loop |
 | `src/lib/suite/store.ts` | SQLite agents/tasks/memory/handoffs |
 | Dashboard | Ongoing · History · Agents |
+| `/beacon` | Concrete app from the lifecycle dry run |
 
 State: `data/suite.db`
 
