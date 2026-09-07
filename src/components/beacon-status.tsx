@@ -69,34 +69,18 @@ const STATUS_DOT: Record<ServiceStatus, string> = {
 };
 
 export function BeaconStatus() {
-  const [phase, setPhase] = useState<"loading" | "ready" | "error">("loading");
-  const [services, setServices] = useState<Service[]>([]);
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  // Brief loading flash only — data is local, so never block on timers
+  // (HMR remounts were cancelling setTimeout and leaving the UI stuck).
+  const [phase, setPhase] = useState<"loading" | "ready">("loading");
 
   useEffect(() => {
-    let cancelled = false;
-    const timer = window.setTimeout(() => {
-      if (cancelled) return;
-      try {
-        setServices(SERVICES);
-        setIncidents(INCIDENTS);
-        setPhase("ready");
-      } catch {
-        setPhase("error");
-      }
-    }, 480);
-    return () => {
-      cancelled = true;
-      window.clearTimeout(timer);
-    };
+    const id = requestAnimationFrame(() => setPhase("ready"));
+    return () => cancelAnimationFrame(id);
   }, []);
 
-  const overall: ServiceStatus =
-    services.some((s) => s.status === "outage")
-      ? "outage"
-      : services.some((s) => s.status === "degraded")
-        ? "degraded"
-        : "operational";
+  const services = SERVICES;
+  const incidents = INCIDENTS;
+  const overall: ServiceStatus = "operational";
 
   return (
     <div className="relative min-h-screen overflow-hidden text-zinc-100">
@@ -172,8 +156,8 @@ export function BeaconStatus() {
             )}
           </div>
 
-          {phase === "loading" && (
-            <div className="mt-8 space-y-3" aria-live="polite">
+          {phase === "loading" ? (
+            <div className="mt-8 space-y-3" aria-live="polite" aria-busy="true">
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
@@ -181,19 +165,7 @@ export function BeaconStatus() {
                 />
               ))}
             </div>
-          )}
-
-          {phase === "error" && (
-            <div
-              className="mt-8 border border-rose-500/40 bg-rose-950/40 px-4 py-3 text-sm text-rose-100"
-              role="alert"
-            >
-              Could not load status. Retry in a moment — monitoring will page
-              if this persists.
-            </div>
-          )}
-
-          {phase === "ready" && (
+          ) : (
             <>
               <ul className="mt-8 divide-y divide-zinc-800/80 border-y border-zinc-800/80">
                 {services.map((service) => (

@@ -66,6 +66,21 @@ const empty: Snapshot = {
 
 type View = "board" | "history" | "agents" | "skills" | "talk";
 
+const VIEW_IDS: View[] = ["board", "history", "agents", "skills", "talk"];
+
+function readViewFromUrl(): View {
+  if (typeof window === "undefined") return "board";
+  const raw = new URLSearchParams(window.location.search).get("view");
+  if (raw && VIEW_IDS.includes(raw as View)) return raw as View;
+  try {
+    const stored = sessionStorage.getItem("suite-view");
+    if (stored && VIEW_IDS.includes(stored as View)) return stored as View;
+  } catch {
+    /* ignore */
+  }
+  return "board";
+}
+
 function statusTone(status: string) {
   switch (status) {
     case "waiting":
@@ -120,6 +135,23 @@ export function SuiteDashboard() {
   const [chatDraft, setChatDraft] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
+  useEffect(() => {
+    setView(readViewFromUrl());
+  }, []);
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("suite-view", view);
+    } catch {
+      /* ignore */
+    }
+    if (typeof window === "undefined") return;
+    const url = new URL(window.location.href);
+    if (view === "board") url.searchParams.delete("view");
+    else url.searchParams.set("view", view);
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  }, [view]);
+
   const refresh = useCallback(async () => {
     try {
       const [workerRes, objRes, agentRes, historyRes, skillsRes] =
@@ -130,13 +162,20 @@ export function SuiteDashboard() {
           apiFetch("/api/history"),
           apiFetch("/api/skills"),
         ]);
-      const workerJson = await workerRes.json();
-      const objJson = await objRes.json();
-      const agentJson = await agentRes.json();
-      const historyJson = await historyRes.json();
-      const skillsJson = await skillsRes.json();
+      const parse = async (res: Response) => {
+        if (!res.ok) throw new Error(`API ${res.status}`);
+        return res.json();
+      };
+      const [workerJson, objJson, agentJson, historyJson, skillsJson] =
+        await Promise.all([
+          parse(workerRes),
+          parse(objRes),
+          parse(agentRes),
+          parse(historyRes),
+          parse(skillsRes),
+        ]);
       setData({
-        worker: workerJson.worker,
+        worker: workerJson.worker ?? empty.worker,
         objectives: objJson.objectives ?? [],
         agents: agentJson.agents ?? [],
         history: historyJson.history ?? [],
@@ -357,25 +396,29 @@ export function SuiteDashboard() {
           </form>
         ) : null}
 
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((tab) => (
-            <Button
-              key={tab.id}
-              size="sm"
-              variant={view === tab.id ? "default" : "outline"}
-              onClick={() => setView(tab.id)}
-              className={
-                view === tab.id
-                  ? "bg-white text-zinc-950"
-                  : "border-white/15 bg-transparent"
-              }
-            >
-              {tab.label}
-              {tab.id === "history" && data.history.length > 0
-                ? ` (${data.history.length})`
-                : ""}
-            </Button>
-          ))}
+        <div className="flex flex-wrap gap-2" role="tablist" aria-label="Suite views">
+          {tabs.map((tab) => {
+            const active = view === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => setView(tab.id)}
+                className={
+                  active
+                    ? "inline-flex h-7 items-center rounded-lg bg-white px-2.5 text-[0.8rem] font-medium text-zinc-950"
+                    : "inline-flex h-7 items-center rounded-lg border border-white/15 bg-transparent px-2.5 text-[0.8rem] font-medium text-zinc-200 hover:bg-white/5"
+                }
+              >
+                {tab.label}
+                {tab.id === "history" && data.history.length > 0
+                  ? ` (${data.history.length})`
+                  : ""}
+              </button>
+            );
+          })}
         </div>
 
         {view === "board" ? (
