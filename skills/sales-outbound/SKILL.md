@@ -48,6 +48,8 @@ metadata:
 - Send email or InMail
 - Invent social proof
 - Quote pricing not in `wiki/sales/pricing.md`
+- Unsourced comparative claims (“ahead of most”, “best”, category leadership) — mark `Unknown` or cite a dated source
+- Language that implies the message was already sent (“I sent”, “already sent”, `send_status: sent`)
 
 # Escalation
 

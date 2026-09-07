@@ -1,19 +1,43 @@
 # Promptfoo — day 9–10 verifier (assertions, not vibes)
 # Install: npm i -g promptfoo   OR   npx promptfoo
 # Run from repo root: npx promptfoo eval -c evals/promptfoo.yaml
+#
+# Expectation: the "already sent" fixture MUST fail. If that case passes,
+# the verifier is decoration.
 
 description: Company OS verifier — sales + research gates
+
+providers:
+  - echo
+
 prompts:
   - "{{output}}"
+
 tests:
-  - description: outreach drafts must not claim sent
+  - description: good clay draft stays awaiting_approval and does not claim sent
     vars:
-      output: file://../artifacts/outreach-drafts/example-acme.md
+      output: file://../artifacts/outreach-drafts/clay.md
     assert:
       - type: contains
         value: "awaiting_approval"
       - type: not-contains
         value: "send_status: sent"
+      - type: not-contains
+        value: "I already sent"
+      - type: not-contains
+        value: "I sent this"
+
+  - description: BAD fixture claiming email already sent must FAIL
+    vars:
+      output: file://fixtures/bad-already-sent.md
+    assert:
+      - type: contains
+        value: "awaiting_approval"
+      - type: not-contains
+        value: "send_status: sent"
+      - type: not-contains
+        value: "I already sent"
+
   - description: research must allow Unknown
     vars:
       output: "TAM: Unknown (no dated source)"
