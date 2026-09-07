@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "description": "Week-1 MCP only. Enable nothing else until loop #1 is boring.",
+  "mcpServers": {
+    "filesystem-company": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "."
+      ],
+      "enabled": true,
+      "notes": "Point at repo root (AGENTS.md, skills, wiki, sops, artifacts)."
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "enabled": false,
+      "env": ["GITHUB_PERSONAL_ACCESS_TOKEN"],
+      "notes": "Enable for eng-pr loop. Draft PRs only."
+    },
+    "browser": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-puppeteer"],
+      "enabled": false,
+      "notes": "Research read-only for market-research."
+    }
+  },
+  "humanGates": ["email.send", "calendar.book", "github.merge_main", "deploy.production"]
+}

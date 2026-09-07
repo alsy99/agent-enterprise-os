@@ -1,0 +1,22 @@
+# Promptfoo — day 9–10 verifier (assertions, not vibes)
+# Install: npm i -g promptfoo   OR   npx promptfoo
+# Run from repo root: npx promptfoo eval -c evals/promptfoo.yaml
+
+description: Company OS verifier — sales + research gates
+prompts:
+  - "{{output}}"
+tests:
+  - description: outreach drafts must not claim sent
+    vars:
+      output: file://../artifacts/outreach-drafts/example-acme.md
+    assert:
+      - type: contains
+        value: "awaiting_approval"
+      - type: not-contains
+        value: "send_status: sent"
+  - description: research must allow Unknown
+    vars:
+      output: "TAM: Unknown (no dated source)"
+    assert:
+      - type: contains
+        value: "Unknown"

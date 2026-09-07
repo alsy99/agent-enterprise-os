@@ -1,32 +1,52 @@
-# agent-enterprise-os
+# Agent Enterprise OS
 
-This repository contains **two separate things**. Do not mix them.
+File-based **Company OS** harness: `AGENTS.md` + `SKILL.md` + wiki/SOPs + correction → eval + traces.
 
-## 1. Company OS (this project’s harness) — `company/`
+Not a multi-agent orchestration platform. No Nova suite. One money loop first.
 
-File-based operating system for agents:
+## Layout
 
-- `AGENTS.md` + `SKILL.md`
-- `wiki/` + `sops/`
-- correction → eval
-- traces + Promptfoo verifier
-
-**Start here:** [company/README.md](./company/README.md) · [company/SETUP.md](./company/SETUP.md)
-
-Week-1 loop: **research → draft outreach (never send)**.  
-Not in weeks: full market/sales/product/design/eng/ops autonomy.
-
-## 2. Agent Suite (separate product) — repo root Next.js app
-
-Forever-online **orchestrator-workers** demo (Nova + workers, Beacon UI). Built in a different thread. It is **not** Company OS.
-
-```bash
-npm install
-npm run dev   # http://127.0.0.1:43123
+```text
+AGENTS.md
+CLAUDE.md -> AGENTS.md
+skills/
+  market-research/SKILL.md
+  sales-outbound/SKILL.md
+  eng-pr/SKILL.md
+  support-l1/SKILL.md
+wiki/
+sops/
+evals/
+traces/
+memory/
+integrations/mcp/
+artifacts/
+scripts/record-correction.sh
+SETUP.md
 ```
 
-See root historical docs for Suite deploy. Do not treat Suite as the company brain.
+## Week-1 loop
 
-## Rule
+`market-research` → `sales-outbound` (draft only; human `APPROVE_SEND`).
 
-Steal Hermes/OpenCode + skills files. Do not build another orchestrator to “be the company.”
+Clone later: `eng-pr`. Do not add a C-suite of autonomous departments until loop #1 is boring.
+
+## Stack
+
+| Layer | Use |
+|---|---|
+| Always-on / learning | Hermes Agent |
+| Eng artifacts | OpenCode or OpenHands |
+| Skills | This repo (+ audited packs later) |
+| Correction → skill | ACE optional + `scripts/record-correction.sh` |
+| Traces | Langfuse or `traces/*.md` |
+| Verifier | Promptfoo (`evals/promptfoo.yaml`) |
+
+## Quick start
+
+See [SETUP.md](./SETUP.md).
+
+```bash
+chmod +x scripts/record-correction.sh
+# Point Hermes / OpenCode at this repo root; it loads AGENTS.md
+```
