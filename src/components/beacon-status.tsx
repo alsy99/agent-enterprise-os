@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type ServiceStatus = "operational" | "degraded" | "outage";
 
@@ -69,15 +69,6 @@ const STATUS_DOT: Record<ServiceStatus, string> = {
 };
 
 export function BeaconStatus() {
-  // Brief loading flash only — data is local, so never block on timers
-  // (HMR remounts were cancelling setTimeout and leaving the UI stuck).
-  const [phase, setPhase] = useState<"loading" | "ready">("loading");
-
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setPhase("ready"));
-    return () => cancelAnimationFrame(id);
-  }, []);
-
   const services = SERVICES;
   const incidents = INCIDENTS;
   const overall: ServiceStatus = "operational";
@@ -146,75 +137,60 @@ export function BeaconStatus() {
                 Simulated signals for the dry-run product slice.
               </p>
             </div>
-            {phase === "ready" && (
-              <p className="flex items-center gap-2 text-sm font-medium text-teal-200">
-                <span
-                  className={`h-2.5 w-2.5 animate-pulse rounded-full ${STATUS_DOT[overall]}`}
-                />
-                All systems {STATUS_LABEL[overall].toLowerCase()}
-              </p>
-            )}
+            <p className="flex items-center gap-2 text-sm font-medium text-teal-200">
+              <span
+                className={`h-2.5 w-2.5 animate-pulse rounded-full ${STATUS_DOT[overall]}`}
+              />
+              All systems {STATUS_LABEL[overall].toLowerCase()}
+            </p>
           </div>
 
-          {phase === "loading" ? (
-            <div className="mt-8 space-y-3" aria-live="polite" aria-busy="true">
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  className="h-14 animate-pulse rounded-md bg-zinc-800/60"
-                />
-              ))}
-            </div>
-          ) : (
-            <>
-              <ul className="mt-8 divide-y divide-zinc-800/80 border-y border-zinc-800/80">
-                {services.map((service) => (
-                  <li
-                    key={service.id}
-                    className="flex flex-col gap-1 py-4 animate-in fade-in slide-in-from-bottom-2 duration-500 sm:flex-row sm:items-center sm:justify-between"
-                  >
-                    <div>
-                      <p className="font-medium text-zinc-100">{service.name}</p>
-                      <p className="text-sm text-zinc-500">{service.detail}</p>
-                    </div>
-                    <p className="flex items-center gap-2 text-sm text-zinc-300">
-                      <span
-                        className={`h-2 w-2 rounded-full ${STATUS_DOT[service.status]}`}
-                      />
-                      {STATUS_LABEL[service.status]}
+          <ul className="mt-8 divide-y divide-zinc-800/80 border-y border-zinc-800/80">
+            {services.map((service) => (
+              <li
+                key={service.id}
+                className="flex flex-col gap-1 py-4 animate-in fade-in slide-in-from-bottom-2 duration-500 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-medium text-zinc-100">{service.name}</p>
+                  <p className="text-sm text-zinc-500">{service.detail}</p>
+                </div>
+                <p className="flex items-center gap-2 text-sm text-zinc-300">
+                  <span
+                    className={`h-2 w-2 rounded-full ${STATUS_DOT[service.status]}`}
+                  />
+                  {STATUS_LABEL[service.status]}
+                </p>
+              </li>
+            ))}
+          </ul>
+
+          <div className="mt-14">
+            <h3 className="font-[family-name:var(--font-display)] text-xl font-semibold text-white">
+              Recent incidents
+            </h3>
+            {incidents.length === 0 ? (
+              <p className="mt-4 text-sm text-zinc-500">
+                No open incidents. Quiet is good.
+              </p>
+            ) : (
+              <ul className="mt-6 space-y-6">
+                {incidents.map((incident) => (
+                  <li key={incident.id} className="max-w-2xl">
+                    <p className="text-xs uppercase tracking-wide text-zinc-500">
+                      {incident.when} · {incident.severity}
+                    </p>
+                    <p className="mt-1 text-base font-medium text-zinc-100">
+                      {incident.title}
+                    </p>
+                    <p className="mt-1 text-sm text-zinc-400">
+                      {incident.summary}
                     </p>
                   </li>
                 ))}
               </ul>
-
-              <div className="mt-14">
-                <h3 className="font-[family-name:var(--font-display)] text-xl font-semibold text-white">
-                  Recent incidents
-                </h3>
-                {incidents.length === 0 ? (
-                  <p className="mt-4 text-sm text-zinc-500">
-                    No open incidents. Quiet is good.
-                  </p>
-                ) : (
-                  <ul className="mt-6 space-y-6">
-                    {incidents.map((incident) => (
-                      <li key={incident.id} className="max-w-2xl">
-                        <p className="text-xs uppercase tracking-wide text-zinc-500">
-                          {incident.when} · {incident.severity}
-                        </p>
-                        <p className="mt-1 text-base font-medium text-zinc-100">
-                          {incident.title}
-                        </p>
-                        <p className="mt-1 text-sm text-zinc-400">
-                          {incident.summary}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </>
-          )}
+            )}
+          </div>
         </section>
       </main>
     </div>

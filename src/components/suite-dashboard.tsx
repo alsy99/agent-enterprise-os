@@ -124,6 +124,7 @@ function cleanBrief(text: string) {
 export function SuiteDashboard() {
   const [data, setData] = useState<Snapshot>(empty);
   const [view, setView] = useState<View>("board");
+  const [hydrated, setHydrated] = useState(false);
   const [task, setTask] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -136,44 +137,43 @@ export function SuiteDashboard() {
   const [chatBusy, setChatBusy] = useState(false);
 
   useEffect(() => {
+    // Read URL/session only after mount — never wipe ?view= before this runs.
     setView(readViewFromUrl());
+    setHydrated(true);
   }, []);
 
   useEffect(() => {
+    if (!hydrated) return;
     try {
       sessionStorage.setItem("suite-view", view);
     } catch {
       /* ignore */
     }
-    if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
     if (view === "board") url.searchParams.delete("view");
     else url.searchParams.set("view", view);
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-  }, [view]);
+  }, [view, hydrated]);
 
   const refresh = useCallback(async () => {
     try {
-      const [workerRes, objRes, agentRes, historyRes, skillsRes] =
-        await Promise.all([
-          apiFetch("/api/worker"),
-          apiFetch("/api/objectives"),
-          apiFetch("/api/agents"),
-          apiFetch("/api/history"),
-          apiFetch("/api/skills"),
-        ]);
-      const parse = async (res: Response) => {
-        if (!res.ok) throw new Error(`API ${res.status}`);
-        return res.json();
-      };
-      const [workerJson, objJson, agentJson, historyJson, skillsJson] =
-        await Promise.all([
-          parse(workerRes),
-          parse(objRes),
-          parse(agentRes),
-          parse(historyRes),
-          parse(skillsRes),
-        ]);
+      const endpoints = [
+        "/api/worker",
+        "/api/objectives",
+        "/api/agents",
+        "/api/history",
+        "/api/skills",
+      ] as const;
+      const responses = await Promise.all(
+        endpoints.map((path) => apiFetch(path)),
+      );
+      const bodies = await Promise.all(
+        responses.map(async (res, i) => {
+          if (!res.ok) throw new Error(`${endpoints[i]} → ${res.status}`);
+          return res.json();
+        }),
+      );
+      const [workerJson, objJson, agentJson, historyJson, skillsJson] = bodies;
       setData({
         worker: workerJson.worker ?? empty.worker,
         objectives: objJson.objectives ?? [],
@@ -192,6 +192,13 @@ export function SuiteDashboard() {
     const id = setInterval(refresh, 2000);
     return () => clearInterval(id);
   }, [refresh]);
+
+  useEffect(() => {
+    if (view !== "history") return;
+    if (openHistoryId) return;
+    const first = data.history[0]?.objective.id;
+    if (first) setOpenHistoryId(first);
+  }, [view, data.history, openHistoryId]);
 
   const agentById = useMemo(() => {
     const map = new Map<string, AgentRecord>();
@@ -399,13 +406,17 @@ export function SuiteDashboard() {
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Suite views">
           {tabs.map((tab) => {
             const active = view === tab.id;
+            const href = tab.id === "board" ? "/" : `/?view=${tab.id}`;
             return (
-              <button
+              <a
                 key={tab.id}
-                type="button"
+                href={href}
                 role="tab"
                 aria-selected={active}
-                onClick={() => setView(tab.id)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  setView(tab.id);
+                }}
                 className={
                   active
                     ? "inline-flex h-7 items-center rounded-lg bg-white px-2.5 text-[0.8rem] font-medium text-zinc-950"
@@ -416,7 +427,7 @@ export function SuiteDashboard() {
                 {tab.id === "history" && data.history.length > 0
                   ? ` (${data.history.length})`
                   : ""}
-              </button>
+              </a>
             );
           })}
         </div>
