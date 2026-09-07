@@ -218,8 +218,7 @@ export function SuiteDashboard({
 
   function openTalk(agentId: string) {
     setTalkAgentId(agentId);
-    setView("talk");
-    setChatDraft("");
+    window.location.assign(`/talk?agent=${encodeURIComponent(agentId)}`);
   }
 
   async function sendChat(e?: React.FormEvent) {
@@ -244,12 +243,12 @@ export function SuiteDashboard({
     }
   }
 
-  const tabs: Array<{ id: View; label: string }> = [
-    { id: "board", label: "Ongoing" },
-    { id: "history", label: "History" },
-    { id: "agents", label: "Agents" },
-    { id: "talk", label: "Talk" },
-    { id: "skills", label: "Skills" },
+  const tabs: Array<{ id: View; label: string; href: string }> = [
+    { id: "board", label: "Ongoing", href: "/" },
+    { id: "history", label: "History", href: "/history" },
+    { id: "agents", label: "Agents", href: "/agents" },
+    { id: "talk", label: "Talk", href: "/talk" },
+    { id: "skills", label: "Skills", href: "/skills" },
   ];
 
   return (
@@ -345,13 +344,18 @@ export function SuiteDashboard({
         <div className="flex flex-wrap gap-2" role="tablist" aria-label="Suite views">
           {tabs.map((tab) => {
             const active = view === tab.id;
-            const href = tab.id === "board" ? "/" : `/?view=${tab.id}`;
             return (
               <a
                 key={tab.id}
-                href={href}
+                href={tab.href}
                 role="tab"
                 aria-selected={active}
+                onClick={(e) => {
+                  // Force a full document load — Next soft-nav was reusing this
+                  // client tree and leaving Safari stuck on Ongoing / empty state.
+                  e.preventDefault();
+                  window.location.assign(tab.href);
+                }}
                 className={
                   active
                     ? "inline-flex h-7 items-center rounded-lg bg-white px-2.5 text-[0.8rem] font-medium text-zinc-950"

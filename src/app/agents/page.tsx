@@ -3,11 +3,11 @@ import { loadSuiteSnapshot } from "@/lib/suite/snapshot";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
+export default async function AgentsPage() {
   return (
     <SuiteDashboard
-      key="board"
-      initialView="board"
+      key="agents"
+      initialView="agents"
       initialData={loadSuiteSnapshot()}
     />
   );
