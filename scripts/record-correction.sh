@@ -3,6 +3,10 @@
 # Usage:
 #   ./scripts/record-correction.sh
 #   OR pipe a block: cat block.txt | ./scripts/record-correction.sh
+#
+# When PROMOTE=yes, pin the eval id by hand:
+#   EVAL_ID: 007
+# Do not rely on file-count auto-increment (collides when gaps like missing 004 exist).
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIR="$ROOT/traces/corrections"
@@ -18,6 +22,7 @@ should=$(printf '%s\n' "$BLOCK" | sed -n 's/^SHOULD:[[:space:]]*//p' | head -1)
 gap=$(printf '%s\n' "$BLOCK" | sed -n 's/^SOP_GAP:[[:space:]]*//p' | head -1 | tr '[:upper:]' '[:lower:]')
 promote=$(printf '%s\n' "$BLOCK" | sed -n 's/^PROMOTE:[[:space:]]*//p' | head -1 | tr '[:upper:]' '[:lower:]')
 eval_line=$(printf '%s\n' "$BLOCK" | sed -n 's/^EVAL:[[:space:]]*//p' | head -1)
+eval_id=$(printf '%s\n' "$BLOCK" | sed -n 's/^EVAL_ID:[[:space:]]*//p' | head -1 | tr -d '[:space:]')
 
 if [ -z "$wrong" ] || [ -z "$should" ] || [ -z "$gap" ] || [ -z "$promote" ] || [ -z "$eval_line" ]; then
   echo "Need WRONG / SHOULD / SOP_GAP / PROMOTE / EVAL lines" >&2
@@ -38,7 +43,7 @@ file="$DIR/${day}-${slug}.md"
   echo
   echo "## Resolution"
   if [ "$promote" = "yes" ]; then
-    echo "- eval: drafted"
+    echo "- eval: drafted (pin EVAL_ID by hand)"
   else
     echo "- eval: none (PROMOTE=no)"
   fi
@@ -50,12 +55,23 @@ file="$DIR/${day}-${slug}.md"
 echo "Wrote $file"
 
 if [ "$promote" = "yes" ]; then
-  n=$(find "$ROOT/evals" -name '*.yaml' | wc -l | tr -d ' ')
-  n=$((n + 1))
-  id=$(printf '%03d' "$n")
-  eval_file="$ROOT/evals/${id}-from-correction.yaml"
+  if [ -z "$eval_id" ]; then
+    echo "PROMOTE=yes requires EVAL_ID: NNN (pin by hand; do not auto-increment)." >&2
+    echo "Example: EVAL_ID: 007" >&2
+    echo "Correction recorded; no eval file written." >&2
+    exit 2
+  fi
+  if ! printf '%s' "$eval_id" | grep -Eq '^[0-9]{3}$'; then
+    echo "EVAL_ID must be three digits (e.g. 007), got: ${eval_id}" >&2
+    exit 2
+  fi
+  eval_file="$ROOT/evals/${eval_id}-from-correction.yaml"
+  if [ -e "$eval_file" ]; then
+    echo "Refusing to overwrite existing $eval_file — pick a free EVAL_ID." >&2
+    exit 2
+  fi
   {
-    echo "# id: \"${id}\""
+    echo "# id: \"${eval_id}\""
     echo "name: from-correction-${slug}"
     echo "skill: unknown"
     echo "input: |"

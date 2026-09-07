@@ -47,7 +47,10 @@ SHOULD: ...
 SOP_GAP: missing | ambiguous | conflict
 PROMOTE: yes | no
 EVAL: input → expected
+EVAL_ID: 007
 ```
+
+`EVAL_ID` is required when `PROMOTE: yes` — pin the next free three-digit id by hand (gaps like missing `004` are fine).
 
 ```bash
 chmod +x scripts/record-correction.sh
@@ -57,6 +60,7 @@ SHOULD: Keep send_status awaiting_approval and stop
 SOP_GAP: missing
 PROMOTE: yes
 EVAL: draft outreach → send_status awaiting_approval
+EVAL_ID: 005
 EOF
 ```
 

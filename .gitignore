@@ -18,3 +18,8 @@
 # TypeScript / Next leftovers (suite removed)
 *.tsbuildinfo
 next-env.d.ts
+
+# Private dogfood (real prospect emails / personal contact data)
+wiki/sales/leads/**/*.private.md
+artifacts/outreach-drafts/**/*.private.md
+memory/private/

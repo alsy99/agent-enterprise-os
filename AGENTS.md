@@ -43,7 +43,10 @@ SHOULD: ...
 SOP_GAP: missing | ambiguous | conflict
 PROMOTE: yes | no
 EVAL: input → expected
+EVAL_ID: 007
 ```
+
+`EVAL_ID` is required when `PROMOTE: yes` — pin the next free three-digit id by hand (do not auto-increment; gaps like missing `004` are fine).
 
 Pipe into ACE/Hermes skill creation when available. Commit skill patches. Add `evals/NNN.yaml`.
 
