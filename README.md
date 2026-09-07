@@ -8,7 +8,7 @@ Not a multi-agent orchestration platform. No Nova suite. One money loop first.
 
 ```text
 AGENTS.md
-CLAUDE.md -> AGENTS.md
+CLAUDE.md   # same rules as AGENTS.md (regular file — Claude Code does not follow a 9-byte symlink)
 skills/
   market-research/SKILL.md
   sales-outbound/SKILL.md

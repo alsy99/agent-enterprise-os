@@ -1,9 +1,14 @@
 # id: "006"
-name: from-correction-unsourced-comparative
+# STATUS: folded into evals/promptfoo.yaml (echo assertion on fixtures/bad-ahead-of-most.md).
+# This file is a correction note only — it does not run. Do not count as a live eval.
+name: from-correction-unsourced-comparative-NOTE
 skill: sales-outbound
+runs: false
+folded_into: evals/promptfoo.yaml
 input: |
   draft with unsourced "ahead of most" comparative
 expect:
   from_correction: true
   should_note: Only state what the source page says (reasoning traces exist); mark category leadership Unknown
   no_unsourced_comparatives: true
+  enforced_by: promptfoo not-contains "ahead of most"

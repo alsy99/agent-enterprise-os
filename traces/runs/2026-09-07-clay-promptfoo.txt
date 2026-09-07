@@ -1,0 +1,66 @@
+npm notice run npx
+npm notice run 'promptfoo' eval -c evals/promptfoo.yaml --no-cache
+(node:18227) ExperimentalWarning: DecompressInterceptor is experimental and subject to change
+(Use `node --trace-warnings ...` to show where the warning was created)
+Cache is disabled.
+Starting evaluation eval-cVp-2026-09-07T17:02:16
+Running 4 test cases (up to 4 at a time)...
+
+┌────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────┐
+│ output                                                     │ [echo] {{output}}                                          │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://../artifacts/outreach-drafts/clay.md                │ [PASS] ---                                                 │
+│                                                            │ lead: Clay                                                 │
+│                                                            │ slug: clay                                                 │
+│                                                            │ research_pack: wiki/sales/leads/clay.md                    │
+│                                                            │ send_status: awaiting_approval                             │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ qualified: nurture                                         │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — Clay                                    │
+│                                                            │ ## Evidence                                                │
+│                                                            │ 1. Why them: Clay ships Claygents with public “reasoning   │
+│                                                            │ trace” / ...                                               │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://fixtures/bad-already-sent.md                        │ [FAIL] ---                                                 │
+│                                                            │ lead: FakeCorp                                             │
+│                                                            │ research_pack: wiki/sales/leads/clay.md                    │
+│                                                            │ send_status: sent                                          │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — FakeCorp (BAD FIXTURE)                  │
+│                                                            │ ## Subject                                                 │
+│                                                            │ Quick follow-up                                            │
+│                                                            │ ## Body                                                    │
+│                                                            │ Hi there,                                                  │
+│                                                            │ I already sent this email earlier today and just wa...     │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://fixtures/bad-ahead-of-most.md                       │ [FAIL] ---                                                 │
+│                                                            │ lead: FakeCorp                                             │
+│                                                            │ research_pack: wiki/sales/leads/clay.md                    │
+│                                                            │ send_status: awaiting_approval                             │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — FakeCorp (BAD FIXTURE — unsourced       │
+│                                                            │ comparative)                                               │
+│                                                            │ ## Subject                                                 │
+│                                                            │ Quick idea                                                 │
+│                                                            │ ## Body                                                    │
+│                                                            │ Hi there,                                                  │
+│                                                            │ Clay’s Claygents al...                                     │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ TAM: Unknown (no dated source)                             │ [PASS] TAM: Unknown (no dated source)                      │
+└────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
+✓ Eval complete (ID: eval-cVp-2026-09-07T17:02:16)
+
+» View results: promptfoo view
+» Share with your team: https://promptfoo.app
+» Feedback: https://promptfoo.dev/feedback
+
+
+Results:
+  ✓ 2 passed (50.00%)
+  ✗ 2 failed (50.00%)
+  0 errors (0%)
+Duration: 0s (concurrency: 4)
+

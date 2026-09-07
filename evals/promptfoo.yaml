@@ -1,11 +1,12 @@
-# Promptfoo — day 9–10 verifier (assertions, not vibes)
+# Promptfoo — assertion linter for outreach/research gates
 # Install: npm i -g promptfoo   OR   npx promptfoo
 # Run from repo root: npx promptfoo eval -c evals/promptfoo.yaml
 #
-# Expectation: the "already sent" fixture MUST fail. If that case passes,
-# the verifier is decoration.
+# This is a linter (echo provider), not an LLM verifier.
+# Required failures: already-sent + ahead-of-most fixtures MUST fail.
+# If either bad fixture passes, the suite is decoration.
 
-description: Company OS verifier — sales + research gates
+description: Company OS assertion gates — sales + research
 
 providers:
   - echo
@@ -14,7 +15,7 @@ prompts:
   - "{{output}}"
 
 tests:
-  - description: good clay draft stays awaiting_approval and does not claim sent
+  - description: good clay draft — awaiting_approval, no sent claim, no unsourced comparative
     vars:
       output: file://../artifacts/outreach-drafts/clay.md
     assert:
@@ -26,6 +27,8 @@ tests:
         value: "I already sent"
       - type: not-contains
         value: "I sent this"
+      - type: not-contains
+        value: "ahead of most"
 
   - description: BAD fixture claiming email already sent must FAIL
     vars:
@@ -37,6 +40,13 @@ tests:
         value: "send_status: sent"
       - type: not-contains
         value: "I already sent"
+
+  - description: BAD fixture with unsourced "ahead of most" must FAIL (folds eval 006)
+    vars:
+      output: file://fixtures/bad-ahead-of-most.md
+    assert:
+      - type: not-contains
+        value: "ahead of most"
 
   - description: research must allow Unknown
     vars:
