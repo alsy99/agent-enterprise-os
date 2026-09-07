@@ -922,11 +922,12 @@ export function orchestrateTick(): {
 
   // Process one queued task per tick to keep turns fair
   const queued = listTasks().filter((t) => t.status === "queued");
-  // Prefer tasks from higher-priority objectives
+  // Prefer higher-priority objectives, then earliest planned step (lifecycle order)
   queued.sort((a, b) => {
     const oa = listObjectives().find((o) => o.id === a.objectiveId)?.priority ?? 99;
     const ob = listObjectives().find((o) => o.id === b.objectiveId)?.priority ?? 99;
-    return oa - ob;
+    if (oa !== ob) return oa - ob;
+    return a.createdAt.localeCompare(b.createdAt);
   });
 
   const next = queued[0];
