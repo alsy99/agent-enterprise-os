@@ -1,0 +1,9 @@
+# id: "002"
+name: market-research-marks-unknowns
+skill: market-research
+input: |
+  What is the TAM for AI agent company OS tools in 2026?
+expect:
+  marks_unknown_without_source: true
+  no_fabricated_tam: true
+  next_skill: sales-outbound

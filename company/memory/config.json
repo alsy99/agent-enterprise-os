@@ -1,0 +1,7 @@
+{
+  "provider": "markdown-first",
+  "optional": ["mem0", "letta"],
+  "promoteRequiresHuman": true,
+  "correctionFormat": ["WRONG", "SHOULD", "SOP_GAP", "PROMOTE", "EVAL"],
+  "minTracesBeforeVectorDb": 30
+}

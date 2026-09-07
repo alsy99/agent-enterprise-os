@@ -1,118 +1,32 @@
-# Agent Suite — Forever Online
+# agent-enterprise-os
 
-Self-learning, forever-running multi-agent system. **Nova** is the orchestrator: she accepts a single task brief, plans with Skills, and routes workers.
+This repository contains **two separate things**. Do not mix them.
 
-Designed against Anthropic’s guidance:
+## 1. Company OS (this project’s harness) — `company/`
 
-- [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents)
-- [Agent Skills overview](https://platform.claude.com/docs/en/agents-and-tools/agent-skills/overview)
+File-based operating system for agents:
 
-## Guidelines we follow
+- `AGENTS.md` + `SKILL.md`
+- `wiki/` + `sops/`
+- correction → eval
+- traces + Promptfoo verifier
 
-| Principle | How this suite applies it |
-|---|---|
-| Prefer simple, composable patterns | Nova uses **orchestrator-workers**; review skill documents **evaluator-optimizer** |
-| Transparency | Plans, assignment “why”, and handoffs are persisted and shown in History |
-| Progressive disclosure (Skills) | `skills/*/SKILL.md` — metadata for discovery; full instructions load only when a step runs |
-| Description = what + when | Every Skill frontmatter states both so Nova can match briefs |
-| Start simple | Single task input; default pipeline is research → (specialists) → implement → review → learn. Full-lifecycle briefs expand to research → design → build → deploy → monitor → review → learn |
-| Guardrails + stopping conditions | Per-agent guardrails; spawn caps; one worker turn per tick |
-| Lifecycle dry run | **Beacon** at `/beacon` — market research through monitoring as one objective |
+**Start here:** [company/README.md](./company/README.md) · [company/SETUP.md](./company/SETUP.md)
 
-## What it does
+Week-1 loop: **research → draft outreach (never send)**.  
+Not in weeks: full market/sales/product/design/eng/ops autonomy.
 
-- **Wake on start** — boots with the Next.js server or `npm run worker`
-- **Forever-online agents** — Nova, Kai, Remy, Sable, Iori (+ specialists) wait their turn
-- **Skills-based routing** — Nova matches the brief to Skill metadata, then loads instructions per turn
-- **Dynamic spawn** — missing capabilities create specialists
-- **Learning + handoffs** — SQLite memory, playbooks, History view
+## 2. Agent Suite (separate product) — repo root Next.js app
 
-## Deploy
-
-- **Frontend → GitHub Pages** (static `out/`)
-- **Backend → Cursor Cloud** (`npm run api` + Cloudflare tunnel)
-
-See **[DEPLOY.md](./DEPLOY.md)** for the full steps, secrets, and caveats.
-
-Quick Cloud backend:
-
-```bash
-npm run api
-# then tunnel, e.g. cloudflared tunnel --url http://127.0.0.1:43124
-```
-
-Static frontend build (point at your public API):
-
-```bash
-NEXT_PUBLIC_API_BASE=https://YOUR-TUNNEL.trycloudflare.com npm run build:pages
-```
-
-## Quick start
+Forever-online **orchestrator-workers** demo (Nova + workers, Beacon UI). Built in a different thread. It is **not** Company OS.
 
 ```bash
 npm install
-npm run dev
+npm run dev   # http://127.0.0.1:43123
 ```
 
-Open [http://127.0.0.1:43123](http://127.0.0.1:43123).
+See root historical docs for Suite deploy. Do not treat Suite as the company brain.
 
-```bash
-npm run worker   # standalone forever process
-```
+## Rule
 
-```bash
-curl -X POST http://127.0.0.1:43123/api/objectives \
-  -H 'content-type: application/json' \
-  -d '{"task":"Write a short onboarding guide with a security pass"}'
-```
-
-List Skills (Level 1 metadata): `GET /api/skills`
-
-## Skills layout
-
-```
-skills/
-  nova-orchestrate/SKILL.md
-  research/SKILL.md
-  design/SKILL.md
-  implement/SKILL.md
-  deploy/SKILL.md
-  monitor/SKILL.md
-  review/SKILL.md
-  learn/SKILL.md
-  security-pass/SKILL.md
-  docs/SKILL.md
-```
-
-Each file uses Claude-style YAML frontmatter (`name`, `description`) plus instructions. Add a new folder + `SKILL.md` and Nova can discover it on the next plan.
-
-## Lifecycle dry run (Beacon)
-
-Product slice at [`/beacon`](http://127.0.0.1:43123/beacon) — notes in `artifacts/beacon/`.
-
-```bash
-curl -X POST http://127.0.0.1:43123/api/objectives \
-  -H 'content-type: application/json' \
-  -d '{"task":"Full lifecycle dry run from scratch: market research, product design, development, deployment, and monitoring for Beacon — a public status page for indie SaaS founders."}'
-```
-
-Watch Ongoing → History for stage outputs from Kai, design/deploy/monitor specialists, Remy, Sable, and Iori.
-
-## Architecture
-
-| Piece | Role |
-|---|---|
-| `skills/` | Filesystem Agent Skills (progressive disclosure) |
-| `src/lib/suite/skills.ts` | Metadata listing, match-by-description, on-trigger load |
-| `src/lib/suite/orchestrator.ts` | Nova planning + worker turns |
-| `src/lib/suite/worker.ts` | Forever tick loop |
-| `src/lib/suite/store.ts` | SQLite agents/tasks/memory/handoffs |
-| Dashboard | Ongoing · History · Agents |
-| `/beacon` | Concrete app from the lifecycle dry run |
-
-State: `data/suite.db`
-
-## Notes
-
-- Local deterministic runtime (no API key required) so the forever loop always runs.
-- Learning is playbook + memory persistence — ready to swap worker turns for Claude later while keeping the same Skills ACI.
+Steal Hermes/OpenCode + skills files. Do not build another orchestrator to “be the company.”

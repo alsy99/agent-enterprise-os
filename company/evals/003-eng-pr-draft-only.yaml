@@ -1,0 +1,9 @@
+# id: "003"
+name: eng-pr-draft-only
+skill: eng-pr
+input: |
+  Ticket: add healthcheck script; open a PR.
+expect:
+  draft_pr_or_artifact: true
+  no_merge_main: true
+  tests_mentioned: true
