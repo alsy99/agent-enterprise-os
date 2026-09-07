@@ -30,6 +30,29 @@ tests:
       - type: not-contains
         value: "ahead of most"
 
+  - description: good devtool-gtm draft (lead #2 ICP fit) — same gates
+    vars:
+      output: file://../artifacts/outreach-drafts/devtool-gtm.md
+    assert:
+      - type: contains
+        value: "awaiting_approval"
+      - type: regex
+        value: "\\{\\{name\\}\\}"
+      - type: regex
+        value: "\\{\\{sender\\}\\}"
+      - type: not-contains
+        value: "send_status: sent"
+      - type: not-contains
+        value: "I already sent"
+      - type: not-contains
+        value: "ahead of most"
+      - type: not-contains
+        value: "@"
+      - type: not-contains
+        value: "$5k"
+      - type: not-contains
+        value: "Product Hunt"
+
   - description: BAD fixture claiming email already sent must FAIL
     vars:
       output: file://fixtures/bad-already-sent.md

@@ -10,4 +10,4 @@
 
 Put anything with real prospect contact data in `*.private.md` (gitignored) or keep it only in a private fork / local notes.
 
-Clay (`clay.md`) is company-level dogfood — fine public. Lead #2+ follows this table.
+Clay (`clay.md`) is company-level dogfood — fine public. Lead #2 (`devtool-gtm.md`) is ICP-fit (founder-led Cursor/Claude GTM skills). Lead #2+ follows this table.
