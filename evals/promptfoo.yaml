@@ -33,7 +33,7 @@ tests:
   - description: good devtool-gtm draft (lead #2 ICP fit) — same gates
     vars:
       output: file://../artifacts/outreach-drafts/devtool-gtm.md
-    assert:
+    assert: &good_draft_gates
       - type: contains
         value: "awaiting_approval"
       - type: regex
@@ -52,6 +52,21 @@ tests:
         value: "$5k"
       - type: not-contains
         value: "Product Hunt"
+
+  - description: good indebtio draft (lead #3 buyer — solo Claude Code)
+    vars:
+      output: file://../artifacts/outreach-drafts/indebtio.md
+    assert: *good_draft_gates
+
+  - description: good openstatus draft (lead #4 buyer — lean MCP/Cursor)
+    vars:
+      output: file://../artifacts/outreach-drafts/openstatus.md
+    assert: *good_draft_gates
+
+  - description: good appear draft (lead #5 buyer — agentic IDE/MCP product)
+    vars:
+      output: file://../artifacts/outreach-drafts/appear.md
+    assert: *good_draft_gates
 
   - description: BAD fixture claiming email already sent must FAIL
     vars:
