@@ -1,11 +1,26 @@
 # SETUP — two-week Company OS (not a platform)
 
-## Days 1–2 — runtime
+## Days 1–2 — runtime + models
 
 1. Install **Hermes Agent** (learn + write skills) *or* **OpenCode** (eng-first).
-2. One model API key.
+2. Copy `.env.example` → `.env`. Fill at least `GOOGLE_API_KEY` + `GROQ_API_KEY`.
 3. Point the harness at this **repo root**. `AGENTS.md` + `CLAUDE.md` are here.
 4. Enable MCP from `integrations/mcp/mcp.json` (filesystem on; GitHub/browser when needed).
+5. Wire models (route by job — see `integrations/models/`):
+
+```bash
+cp .env.example .env
+# optional proxy:
+pip install 'litellm[proxy]'
+set -a && source .env && set +a
+litellm --config integrations/litellm/config.yaml --port 4000
+# OpenCode: configs/opencode.models.example.json
+# Hermes:  source configs/hermes.env.example
+./scripts/resolve-model.sh market-research
+./scripts/resolve-model.sh sales-outbound verifier
+```
+
+**Week-1 defaults:** Flash-Lite = worker, Flash = planner, Groq gpt-oss = verifier. Add NIM GLM-5.2 only when coding quality bottlenecks.
 
 Steal skills later from: anthropics/skills, obra/superpowers, wshobson/agents — audit scripts; do not install thousands.
 

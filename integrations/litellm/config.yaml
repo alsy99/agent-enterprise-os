@@ -1,0 +1,95 @@
+# LiteLLM proxy — OpenAI-compatible front door for Hermes / OpenCode / Promptfoo
+# Run: litellm --config integrations/litellm/config.yaml --port 4000
+# Point harness base_url to http://127.0.0.1:4000/v1
+
+model_list:
+  # --- Roles (logical names used by the harness) ---
+  - model_name: planner
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GOOGLE_API_KEY
+    model_info:
+      role: planner
+      note: Prefer gemini-3.5-flash / 3.6-flash when available in your Studio project.
+
+  - model_name: worker
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GOOGLE_API_KEY
+    model_info:
+      role: worker
+      note: Use 3.5/3.1 flash-lite IDs when your key exposes them.
+
+  - model_name: verifier
+    litellm_params:
+      model: groq/openai/gpt-oss-120b
+      api_key: os.environ/GROQ_API_KEY
+    model_info:
+      role: verifier
+      family: groq
+      rule: Different family than Gemini actor.
+
+  - model_name: coder
+    litellm_params:
+      model: nvidia_nim/z-ai/glm-5.2
+      api_key: os.environ/NVIDIA_API_KEY
+      api_base: https://integrate.api.nvidia.com/v1
+    model_info:
+      role: coder
+      restrictions: no_customer_pii
+
+  - model_name: thinker
+    litellm_params:
+      model: openai/glm-4.7-flash
+      api_key: os.environ/ZAI_API_KEY
+      api_base: https://open.bigmodel.cn/api/paas/v4
+    model_info:
+      role: thinker
+      concurrent: 1
+
+  - model_name: failover
+    litellm_params:
+      model: openrouter/openrouter/free
+      api_key: os.environ/OPENROUTER_API_KEY
+      api_base: https://openrouter.ai/api/v1
+    model_info:
+      role: failover
+
+  # --- Direct aliases (optional) ---
+  - model_name: gemini-flash
+    litellm_params:
+      model: gemini/gemini-2.5-flash
+      api_key: os.environ/GOOGLE_API_KEY
+
+  - model_name: gemini-flash-lite
+    litellm_params:
+      model: gemini/gemini-2.5-flash-lite
+      api_key: os.environ/GOOGLE_API_KEY
+
+  - model_name: groq-gpt-oss
+    litellm_params:
+      model: groq/openai/gpt-oss-120b
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: groq-qwen
+    litellm_params:
+      model: groq/qwen/qwen3.6-27b
+      api_key: os.environ/GROQ_API_KEY
+
+  - model_name: codestral
+    litellm_params:
+      model: mistral/codestral-latest
+      api_key: os.environ/MISTRAL_API_KEY
+
+router_settings:
+  routing_strategy: simple-shuffle
+  num_retries: 2
+  timeout: 120
+  fallbacks:
+    - planner: [failover, thinker]
+    - worker: [groq-gpt-oss, groq-qwen, failover]
+    - verifier: [thinker, gemini-flash]
+    - coder: [codestral, failover]
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

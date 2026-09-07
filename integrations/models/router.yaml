@@ -1,0 +1,100 @@
+# Company OS — model router
+# Do not pick one “best” model. Route by job.
+# Verifier MUST be a different family than the actor.
+
+version: 1
+policy:
+  free_tiers_ok_for: prototype_weeks
+  not_ok_for: "95% unattended all-day company ops"
+  no_pii_on:
+    - nvidia_nim_trial
+    - openrouter_free_hosts
+    - gemini_free
+  start_this_week:
+    worker: gemini-flash-lite
+    planner: gemini-flash
+    verifier: groq-gpt-oss
+    add_when_coding_bottleneck: nim-glm-5.2
+
+roles:
+  planner:
+    description: Plan, research, SOP writing, tool-heavy agents
+    primary: gemini-flash
+    fallback:
+      - openrouter-free-pool
+      - nim-nemotron-super
+  worker:
+    description: Classify, extract, rewrite, short tool steps
+    primary: gemini-flash-lite
+    fallback:
+      - groq-gpt-oss
+      - groq-qwen
+  verifier:
+    description: Second opinion; must differ in family from actor
+    primary: groq-gpt-oss
+    alternate:
+      - zai-glm-4.7-flash
+      - gemini-flash
+    rule: never_same_family_as_actor
+  coder:
+    description: Hard coding / PR slices
+    primary: nim-glm-5.2
+    alternate:
+      - nim-laguna-s
+      - mistral-codestral
+      - nim-nemotron-super
+    fallback:
+      - openrouter-laguna-free
+  thinker:
+    description: Plan SOP / review trace — not high-volume actions
+    primary: zai-glm-4.7-flash
+    fallback:
+      - nim-nemotron-super
+  failover:
+    description: When Google/NIM/Groq 429
+    primary: openrouter-free-pool
+
+departments:
+  market-research:
+    skill: market-research
+    actor: planner
+    verifier: thinker
+  sales-outbound:
+    skill: sales-outbound
+    actor: worker
+    verifier: planner
+    verifier_system: |
+      Reject overclaims, invented metrics, fake social proof.
+      Fail if send_status is not awaiting_approval.
+  product-spec:
+    skill: null
+    actor: planner
+    verifier: coder
+  design:
+    skill: null
+    actor: planner
+    verifier: human_if_public
+  engineering:
+    skill: eng-pr
+    actor: coder
+    verifier: worker
+    require_tests: true
+  ops-support:
+    skill: support-l1
+    actor: worker
+    verifier: planner
+
+# Map skill id -> department key
+skill_to_department:
+  market-research: market-research
+  sales-outbound: sales-outbound
+  eng-pr: engineering
+  support-l1: ops-support
+
+loop_default:
+  - skill: market-research
+    role: planner
+  - skill: sales-outbound
+    role: worker
+  - skill: sales-outbound
+    role: verifier

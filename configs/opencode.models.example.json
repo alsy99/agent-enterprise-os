@@ -1,0 +1,22 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "litellm/planner",
+  "provider": {
+    "litellm": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Company OS LiteLLM",
+      "options": {
+        "baseURL": "http://127.0.0.1:4000/v1",
+        "apiKey": "{env:LITELLM_MASTER_KEY}"
+      },
+      "models": {
+        "planner": { "name": "planner" },
+        "worker": { "name": "worker" },
+        "verifier": { "name": "verifier" },
+        "coder": { "name": "coder" },
+        "thinker": { "name": "thinker" },
+        "failover": { "name": "failover" }
+      }
+    }
+  }
+}

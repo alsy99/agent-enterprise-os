@@ -50,3 +50,19 @@ Pipe into ACE/Hermes skill creation when available. Commit skill patches. Add `e
 ## MCP this week
 
 Only: filesystem (this repo), GitHub (read + draft PR), browser (research read-only).
+
+## Models (route by job)
+
+Do not use one model for everything. Roles live in `integrations/models/router.yaml`.
+
+| Role | Default | Use for |
+|---|---|---|
+| planner | Gemini Flash | research, SOP writing, tool-heavy plans |
+| worker | Gemini Flash-Lite | drafts, extract, short tool steps |
+| verifier | Groq gpt-oss-120b | second opinion — **different family than actor** |
+| coder | NIM GLM-5.2 | eng-pr when Gemini is weak |
+| thinker | GLM-4.7-Flash | rare SOP/trace review (1 concurrent) |
+
+Week-1 default: Flash-Lite worker, Flash planner, Groq verifier. Resolve with `./scripts/resolve-model.sh <skill> [actor|verifier]`.
+
+Never put customer PII on NVIDIA NIM trial / OpenRouter free hosts / Gemini free if ToS training is unacceptable.

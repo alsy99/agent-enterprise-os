@@ -4,12 +4,22 @@ description: >
   Turn a ticket into a small PR with tests and a verifier checklist. Use when
   implementing a scoped engineering change or opening a draft PR. Do not merge
   to main without approval.
+metadata:
+  model_actor: coder
+  model_verifier: worker
 ---
 
 # When to use
 
 - Ticket / issue is scoped to one thin slice
 - Coding harness is OpenCode or OpenHands
+
+# Models
+
+- **Actor:** `coder` (NIM GLM-5.2 / Laguna / Codestral)
+- **Verifier:** tests first; LLM second opinion = `worker` or `verifier` (Groq) — not another coding model agreeing with itself
+- No customer PII on NIM trial
+- Resolve: `./scripts/resolve-model.sh eng-pr`
 
 # Steps
 
