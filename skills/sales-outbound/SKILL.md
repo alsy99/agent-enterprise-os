@@ -2,7 +2,8 @@
 name: sales-outbound
 description: >
   First-touch email after research pack. Use when a new lead is qualified and
-  a research pack exists. Draft only — never send without human approval.
+  the research pack includes the Unknown checklist. Draft only — never send
+  without human approval.
 metadata:
   model_actor: worker
   model_verifier: planner
@@ -12,6 +13,7 @@ metadata:
 
 - Lead is qualified (see `sops/sales-qualify.md`)
 - Research pack path exists from `market-research`
+- Research pack contains `## Unknown checklist` **and** all five rows (Headcount / team size, Shipping status of cited features, Decision-maker path, Timeline ≤90 days, Willingness to talk / design-partner interest)
 
 # Models
 
@@ -23,7 +25,7 @@ metadata:
 # Steps
 
 1. Confirm qualification via `sops/sales-qualify.md`.
-2. Read the research pack / wiki page.
+2. Read the research pack / wiki page. **Stop if `## Unknown checklist` or any of the five rows is missing** — run `market-research` first; do not draft.
 3. Write 3 evidence bullets (why them, why now, why us) — no invented proof.
 4. Draft email (subject + body ≤150 words) into `artifacts/outreach-drafts/<slug>.md`.
 5. Set `send_status: awaiting_approval` in that file.
@@ -38,6 +40,7 @@ metadata:
 
 # Definition of done
 
+- Research pack has full Unknown checklist (five rows) before drafting
 - Draft file exists with subject, body, evidence, `send_status: awaiting_approval`
 - Evidence cites research pack paths
 - No fake logos, metrics, or case studies
@@ -45,6 +48,7 @@ metadata:
 
 # Never do
 
+- Draft when the lead page lacks `## Unknown checklist` or any of the five rows
 - Send email or InMail
 - Invent social proof
 - Quote pricing not in `wiki/sales/pricing.md`
@@ -55,3 +59,4 @@ metadata:
 
 - Pricing/legal questions → human
 - Missing research pack → run `market-research` first
+- Missing `## Unknown checklist` or incomplete five rows → run `market-research` first; do not draft
