@@ -108,6 +108,17 @@ tests:
       - type: contains
         value: "do not hand off to `sales-outbound`"
 
+  - description: sales-outbound refuses leads without Unknown checklist (PM handoff lock)
+    vars:
+      output: file://../skills/sales-outbound/SKILL.md
+    assert:
+      - type: contains
+        value: "## Unknown checklist"
+      - type: contains
+        value: "do not draft"
+      - type: contains
+        value: "run `market-research` first"
+
   - description: research must allow Unknown
     vars:
       output: "TAM: Unknown (no dated source)"
