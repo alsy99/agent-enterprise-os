@@ -6,6 +6,7 @@ Ticket: Force Unknown checklist into `skills/market-research/SKILL.md` so lead #
 ## In scope
 
 - `skills/market-research/SKILL.md` — required checklist + DoD
+- `skills/sales-outbound/SKILL.md` — refuse draft without full checklist (handoff gate)
 - `evals/007-market-research-unknown-checklist.yaml` — pinned note
 - `evals/fixtures/bad-lead-missing-checklist.md` + promptfoo gates
 
@@ -13,13 +14,14 @@ Ticket: Force Unknown checklist into `skills/market-research/SKILL.md` so lead #
 
 - Promptfoo CI workflow
 - CLAUDE.md / AGENTS.md dedupe
-- Retrofitting all five existing lead pages to the new table (lead #6+ must comply)
+- Retrofitting leads #1–5 (outbound now blocks missing table; Appear-style debt accepted)
 
 ## Verifier checklist
 
 - [x] `npx promptfoo eval -c evals/promptfoo.yaml` — bad-lead-missing-checklist **FAILS**; skill checklist **PASSES**; prior bad fixtures still **FAIL**
 - [x] No secrets in diff
-- [ ] Draft PR opened — merge needs `APPROVE_MERGE`
+- [x] `sales-outbound` When to use / Escalation require checklist
+- [ ] Merge needs human `APPROVE_MERGE`
 
 ## Test plan
 

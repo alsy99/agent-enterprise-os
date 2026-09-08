@@ -1,9 +1,9 @@
 npm notice run npx
 npm notice run 'promptfoo' eval -c evals/promptfoo.yaml --no-cache
-(node:3244) ExperimentalWarning: DecompressInterceptor is experimental and subject to change
+(node:3801) ExperimentalWarning: DecompressInterceptor is experimental and subject to change
 (Use `node --trace-warnings ...` to show where the warning was created)
 Cache is disabled.
-Starting evaluation eval-Oum-2026-09-08T02:07:23
+Starting evaluation eval-Jae-2026-09-08T02:12:41
 Running 10 test cases (up to 4 at a time)...
 
 ┌────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────┐
@@ -119,7 +119,7 @@ Running 10 test cases (up to 4 at a time)...
 ├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
 │ TAM: Unknown (no dated source)                             │ [PASS] TAM: Unknown (no dated source)                      │
 └────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
-✓ Eval complete (ID: eval-Oum-2026-09-08T02:07:23)
+✓ Eval complete (ID: eval-Jae-2026-09-08T02:12:41)
 
 » View results: promptfoo view
 » Share with your team: https://promptfoo.app
