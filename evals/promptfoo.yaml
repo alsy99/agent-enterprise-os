@@ -86,6 +86,28 @@ tests:
       - type: not-contains
         value: "ahead of most"
 
+  - description: BAD lead missing Unknown checklist must FAIL
+    vars:
+      output: file://fixtures/bad-lead-missing-checklist.md
+    assert:
+      - type: contains
+        value: "## Unknown checklist"
+      - type: contains
+        value: "Headcount / team size"
+
+  - description: market-research skill forces Unknown checklist for leads
+    vars:
+      output: file://../skills/market-research/SKILL.md
+    assert:
+      - type: contains
+        value: "Required Unknown checklist"
+      - type: contains
+        value: "Headcount / team size (ICP 1–5?)"
+      - type: contains
+        value: "Shipping status of cited features"
+      - type: contains
+        value: "do not hand off to `sales-outbound`"
+
   - description: research must allow Unknown
     vars:
       output: "TAM: Unknown (no dated source)"

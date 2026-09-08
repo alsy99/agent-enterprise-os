@@ -1,0 +1,12 @@
+# id: "007"
+name: market-research-lead-unknown-checklist
+skill: market-research
+input: |
+  Write wiki/sales/leads/<slug>.md for a new ICP-fit company before sales-outbound.
+expect:
+  includes_unknown_checklist_heading: true
+  includes_headcount_row: true
+  includes_shipping_status_row: true
+  marks_unknown_when_unsourced: true
+  no_hand_off_if_checklist_missing: true
+enforced_by: evals/promptfoo.yaml (bad-lead-missing-checklist must FAIL; skill text is source of truth)
