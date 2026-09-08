@@ -1,14 +1,23 @@
 # Agent Enterprise OS
 
-File-based **Company OS** harness: `AGENTS.md` + `SKILL.md` + wiki/SOPs + correction → eval + traces.
+File-based **Company OS** harness: agents compound corrections into skills, SOPs, and evals.
 
-Not a multi-agent orchestration platform. No Nova suite. One money loop first.
+Not a multi-agent chat demo. Not “autonomous C-suite by Friday.”
+
+**Charter:** [VISION.md](./VISION.md) (source of truth) · [org/CHARTER.md](./org/CHARTER.md) (quarter scope)
 
 ## Layout
 
 ```text
-AGENTS.md
-CLAUDE.md   # same rules as AGENTS.md (regular file — Claude Code does not follow a 9-byte symlink)
+VISION.md                 # what we are building + how agents may work
+AGENTS.md                 # runtime never-do / always-do (short)
+CLAUDE.md                 # must stay byte-equivalent to AGENTS.md
+org/
+  CHARTER.md
+  pm/SKILL.md             # orchestrator — workers do not call workers
+objectives/
+  _TEMPLATE.md
+  YYYY-MM-DD-<slug>.md
 skills/
   market-research/SKILL.md
   sales-outbound/SKILL.md
@@ -16,20 +25,20 @@ skills/
   support-l1/SKILL.md
 wiki/
 sops/
+  handoff-reject.md
 evals/
 traces/
-memory/
-integrations/mcp/
 artifacts/
-scripts/record-correction.sh
+integrations/models/
+scripts/
 SETUP.md
 ```
 
-## Week-1 loop
+## Default loop (Phase 1)
 
-`market-research` → `sales-outbound` (draft only; human `APPROVE_SEND`).
+PM owns an objective → `market-research` → PM check (Unknown checklist) → `sales-outbound` (draft) → human `APPROVE_SEND`.
 
-Clone later: `eng-pr`. Do not add a C-suite of autonomous departments until loop #1 is boring.
+Clone later: `eng-pr` + QA under CTO. Empty CXO seats are forbidden until that function has a worker + eval + artifact type.
 
 ## Stack
 
@@ -41,7 +50,7 @@ Clone later: `eng-pr`. Do not add a C-suite of autonomous departments until loop
 | Models | `integrations/models/` — planner / worker / verifier (LiteLLM) |
 | Correction → skill | ACE optional + `scripts/record-correction.sh` |
 | Traces | Langfuse or `traces/*.md` |
-| Verifier | Promptfoo + Groq second opinion |
+| Verifier | Promptfoo (assertion linter) + Groq second opinion |
 
 ## Models (week 1)
 
@@ -61,4 +70,5 @@ See [SETUP.md](./SETUP.md).
 ```bash
 chmod +x scripts/record-correction.sh
 # Point Hermes / OpenCode at this repo root; it loads AGENTS.md
+# PM / CXO / CEO turns also read VISION.md + org/CHARTER.md + objectives/
 ```

@@ -1,0 +1,145 @@
+npm notice run npx
+npm notice run 'promptfoo' eval -c evals/promptfoo.yaml --no-cache
+(node:4748) ExperimentalWarning: DecompressInterceptor is experimental and subject to change
+(Use `node --trace-warnings ...` to show where the warning was created)
+Cache is disabled.
+Starting evaluation eval-ZlY-2026-09-08T02:47:09
+Running 11 test cases (up to 4 at a time)...
+
+┌────────────────────────────────────────────────────────────┬────────────────────────────────────────────────────────────┐
+│ output                                                     │ [echo] {{output}}                                          │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://../artifacts/outreach-drafts/clay.md                │ [PASS] ---                                                 │
+│                                                            │ lead: Clay                                                 │
+│                                                            │ slug: clay                                                 │
+│                                                            │ research_pack: wiki/sales/leads/clay.md                    │
+│                                                            │ send_status: awaiting_approval                             │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ qualified: nurture                                         │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — Clay                                    │
+│                                                            │ ## Evidence                                                │
+│                                                            │ 1. Why them: Clay ships Claygents with public “reasoning   │
+│                                                            │ trace” / ...                                               │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://../artifacts/outreach-drafts/devtool-gtm.md         │ [PASS] ---                                                 │
+│                                                            │ lead: The DevTool GTM Company                              │
+│                                                            │ slug: devtool-gtm                                          │
+│                                                            │ research_pack: wiki/sales/leads/devtool-gtm.md             │
+│                                                            │ send_status: awaiting_approval                             │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ qualified: nurture                                         │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — The DevTool GTM Company                 │
+│                                                            │ ## Evidence                                                │
+│                                                            │ 1. Why them: G...                                          │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://../artifacts/outreach-drafts/indebtio.md            │ [PASS] ---                                                 │
+│                                                            │ lead: Indebtio                                             │
+│                                                            │ slug: indebtio                                             │
+│                                                            │ research_pack: wiki/sales/leads/indebtio.md                │
+│                                                            │ send_status: awaiting_approval                             │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ qualified: nurture                                         │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — Indebtio                                │
+│                                                            │ ## Evidence                                                │
+│                                                            │ 1. Why them: Public write-up describes a solo foun...      │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://../artifacts/outreach-drafts/openstatus.md          │ [PASS] ---                                                 │
+│                                                            │ lead: OpenStatus                                           │
+│                                                            │ slug: openstatus                                           │
+│                                                            │ research_pack: wiki/sales/leads/openstatus.md              │
+│                                                            │ send_status: awaiting_approval                             │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ qualified: nurture                                         │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — OpenStatus                              │
+│                                                            │ ## Evidence                                                │
+│                                                            │ 1. Why them: Lean bootstrapped team; about...              │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://../artifacts/outreach-drafts/appear.md              │ [PASS] ---                                                 │
+│                                                            │ lead: Appear                                               │
+│                                                            │ slug: appear                                               │
+│                                                            │ research_pack: wiki/sales/leads/appear.md                  │
+│                                                            │ send_status: awaiting_approval                             │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ qualified: nurture                                         │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — Appear                                  │
+│                                                            │ ## Evidence                                                │
+│                                                            │ 1. Why them: Appear’s site pitches local MCP servers and   │
+│                                                            │ a...                                                       │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://fixtures/bad-already-sent.md                        │ [FAIL] ---                                                 │
+│                                                            │ lead: FakeCorp                                             │
+│                                                            │ research_pack: wiki/sales/leads/clay.md                    │
+│                                                            │ send_status: sent                                          │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — FakeCorp (BAD FIXTURE)                  │
+│                                                            │ ## Subject                                                 │
+│                                                            │ Quick follow-up                                            │
+│                                                            │ ## Body                                                    │
+│                                                            │ Hi there,                                                  │
+│                                                            │ I already sent this email earlier today and just wa...     │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://fixtures/bad-ahead-of-most.md                       │ [FAIL] ---                                                 │
+│                                                            │ lead: FakeCorp                                             │
+│                                                            │ research_pack: wiki/sales/leads/clay.md                    │
+│                                                            │ send_status: awaiting_approval                             │
+│                                                            │ skill: sales-outbound                                      │
+│                                                            │ ---                                                        │
+│                                                            │ # Outreach draft — FakeCorp (BAD FIXTURE — unsourced       │
+│                                                            │ comparative)                                               │
+│                                                            │ ## Subject                                                 │
+│                                                            │ Quick idea                                                 │
+│                                                            │ ## Body                                                    │
+│                                                            │ Hi there,                                                  │
+│                                                            │ Clay’s Claygents al...                                     │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://fixtures/bad-lead-missing-checklist.md              │ [FAIL] # Lead: FakeCorp (BAD FIXTURE — missing Unknown     │
+│                                                            │ checklist)                                                 │
+│                                                            │ Updated: 2026-09-08                                        │
+│                                                            │ Slug: `fake-missing-checklist`                             │
+│                                                            │ Skill: market-research                                     │
+│                                                            │ ## Account hypothesis                                      │
+│                                                            │ Looks like a tiny Cursor team. Headcount omitted on        │
+│                                                            │ purpose for the fixture.                                   │
+│                                                            │ ## Evid...                                                 │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://../skills/market-research/SKILL.md                  │ [PASS] ---                                                 │
+│                                                            │ name: market-research                                      │
+│                                                            │ description: >                                             │
+│                                                            │   Build an ICP/competitor/opportunity research pack with   │
+│                                                            │ dated sources and                                          │
+│                                                            │   explicit unknowns. Use when researching a segment, lead  │
+│                                                            │ company, or market                                         │
+│                                                            │   before outbound. Trigger on market research, ICP, co...  │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ file://../skills/sales-outbound/SKILL.md                   │ [PASS] ---                                                 │
+│                                                            │ name: sales-outbound                                       │
+│                                                            │ description: >                                             │
+│                                                            │   First-touch email after research pack. Use when a new l… │
+│                                                            │ is qualified and                                           │
+│                                                            │   the research pack includes the Unknown checklist. Draft  │
+│                                                            │ only — never send                                          │
+│                                                            │   without human approval.                                  │
+│                                                            │ metadata:                                                  │
+│                                                            │   model_actor: wo...                                       │
+├────────────────────────────────────────────────────────────┼────────────────────────────────────────────────────────────┤
+│ TAM: Unknown (no dated source)                             │ [PASS] TAM: Unknown (no dated source)                      │
+└────────────────────────────────────────────────────────────┴────────────────────────────────────────────────────────────┘
+✓ Eval complete (ID: eval-ZlY-2026-09-08T02:47:09)
+
+» View results: promptfoo view
+» Share with your team: https://promptfoo.app
+» Feedback: https://promptfoo.dev/feedback
+
+
+Results:
+  ✓ 8 passed (72.73%)
+  ✗ 3 failed (27.27%)
+  0 errors (0%)
+Duration: 0s (concurrency: 4)
+
